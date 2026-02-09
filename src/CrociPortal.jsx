@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
 // ── Configuration ────────────────────────────────────────────────────
 const OPENWEATHER_API_KEY = "YOUR_API_KEY_HERE";
@@ -238,6 +238,25 @@ function parsePoundCurrency(str) {
   return parseFloat(cleaned) || 0;
 }
 
+// ── Campaign Group Classification ────────────────────────────────────
+const CAMPAIGN_GROUPS = ["HelloFresh & Green Chef", "HelloFresh Ireland", "tails.com"];
+const CAMPAIGN_GROUP_COLORS = {
+  "HelloFresh & Green Chef": "#3CB6BA",
+  "HelloFresh Ireland": "#22c55e",
+  "tails.com": "#FBC500",
+  "Other": "#64748b",
+};
+
+function getCampaignGroup(client) {
+  if (!client) return "Other";
+  const c = client.toLowerCase();
+  // IMPORTANT: "hellofresh ireland" must be checked BEFORE generic "hellofresh"
+  if (c.includes("hellofresh ireland") || c === "hf ie") return "HelloFresh Ireland";
+  if (c.includes("hellofresh") || c.includes("green chef")) return "HelloFresh & Green Chef";
+  if (c.includes("tails")) return "tails.com";
+  return "Other";
+}
+
 function getWeekMonday(date) {
   const d = new Date(date);
   const day = d.getDay();
@@ -354,6 +373,7 @@ function processDataUK(masterRows, salesDataRows, tmmSalesRows, selectedWeek) {
       return {
         id: `event-${index}`,
         client: (row[6] || "").trim(),
+        campaignGroup: getCampaignGroup((row[6] || "").trim()),
         weekNum: normalizeWeekNum(row[3]),
         startDate: parseMasterDate(row[4]),
         endDate: parseMasterDate(row[5]),
@@ -434,7 +454,7 @@ function processDataUK(masterRows, salesDataRows, tmmSalesRows, selectedWeek) {
   // Merge duplicate events within the same week
   const mergeMap = {};
   events.forEach(event => {
-    const mergeKey = `${event.showName.toLowerCase()}|||${event.weekNum}`;
+    const mergeKey = `${event.campaignGroup}|||${event.showName.toLowerCase()}|||${event.weekNum}`;
     if (!mergeMap[mergeKey]) {
       mergeMap[mergeKey] = { ...event, uniqueAgentNames: new Set(event.uniqueAgentNames || []) };
     } else {
@@ -442,6 +462,8 @@ function processDataUK(masterRows, salesDataRows, tmmSalesRows, selectedWeek) {
       merged.salesTarget += event.salesTarget || 0;
       merged.expectedStaff += event.expectedStaff || 0;
       merged.totalUpfronts += event.totalUpfronts || 0;
+      merged.spaceCost += event.spaceCost || 0;
+      merged.logistics += event.logistics || 0;
       merged.masterSales += event.masterSales || 0;
       merged.liveDays = Math.max(merged.liveDays || 0, event.liveDays || 0);
       if (event.uniqueAgentNames) {
@@ -563,6 +585,7 @@ function processDataUK(masterRows, salesDataRows, tmmSalesRows, selectedWeek) {
       target: event.salesTarget,
       status,
       campaign: event.client,
+      campaignGroup: event.campaignGroup,
       country: event.country,
       staffFraction: event.staffFraction,
       uniqueAgents: event.uniqueAgents,
@@ -890,23 +913,44 @@ function useNotifications(events, salesData) {
   return { notifications, unreadCount, markAllRead, markRead };
 }
 
-function useWeatherData(venues) {
+function useWeatherData(events) {
   const [weatherData, setWeatherData] = useState({});
   const [loading, setLoading] = useState(false);
   const cacheRef = useRef({});
 
+  const eventKey = useMemo(() =>
+    events.map(e => `${e.venue || e.location}:${e.status}`).join(","),
+    [events]
+  );
+
   useEffect(() => {
-    if (!WEATHER_ENABLED || !venues.length) return;
+    if (!WEATHER_ENABLED || !events.length) return;
 
     const fetchWeather = async () => {
       setLoading(true);
       const results = {};
       const now = Date.now();
 
-      const uniqueVenues = [...new Set(venues)];
+      // Build per-venue needs: current weather for live, forecast for upcoming
+      const venueNeeds = {};
+      events.forEach(event => {
+        const venue = event.venue || event.location;
+        if (!venue) return;
+        if (!venueNeeds[venue]) venueNeeds[venue] = { needCurrent: false, needForecast: false, forecastDate: null };
+        if (event.status === "live") {
+          venueNeeds[venue].needCurrent = true;
+        } else if (event.status === "upcoming" && event.rawDate) {
+          venueNeeds[venue].needForecast = true;
+          if (!venueNeeds[venue].forecastDate || event.rawDate < venueNeeds[venue].forecastDate) {
+            venueNeeds[venue].forecastDate = event.rawDate;
+          }
+        }
+      });
 
-      for (const venue of uniqueVenues) {
-        const cached = cacheRef.current[venue];
+      for (const [venue, needs] of Object.entries(venueNeeds)) {
+        const mode = needs.needCurrent ? "current" : "forecast";
+        const cacheKey = `${venue}|||${mode}`;
+        const cached = cacheRef.current[cacheKey];
         if (cached && (now - cached.timestamp) < WEATHER_CACHE_TTL) {
           results[venue] = cached.data;
           continue;
@@ -916,18 +960,51 @@ function useWeatherData(venues) {
         if (!coords) continue;
 
         try {
-          const response = await fetch(
-            `https://api.openweathermap.org/data/2.5/weather?lat=${coords.lat}&lon=${coords.lng}&appid=${OPENWEATHER_API_KEY}&units=metric`
-          );
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          const data = await response.json();
-          const weatherInfo = {
-            temp: Math.round(data.main.temp),
-            icon: data.weather[0]?.icon,
-            description: data.weather[0]?.description,
-          };
-          results[venue] = weatherInfo;
-          cacheRef.current[venue] = { data: weatherInfo, timestamp: now };
+          if (needs.needCurrent) {
+            // Current weather API for live events
+            const response = await fetch(
+              `https://api.openweathermap.org/data/2.5/weather?lat=${coords.lat}&lon=${coords.lng}&appid=${OPENWEATHER_API_KEY}&units=metric`
+            );
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            const weatherInfo = {
+              temp: Math.round(data.main.temp),
+              icon: data.weather[0]?.icon,
+              description: data.weather[0]?.description,
+              type: "current",
+            };
+            results[venue] = weatherInfo;
+            cacheRef.current[cacheKey] = { data: weatherInfo, timestamp: now };
+          } else if (needs.needForecast && needs.forecastDate) {
+            // 5-day forecast API for upcoming events
+            const response = await fetch(
+              `https://api.openweathermap.org/data/2.5/forecast?lat=${coords.lat}&lon=${coords.lng}&appid=${OPENWEATHER_API_KEY}&units=metric`
+            );
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            // Find closest forecast entry to event start date
+            const targetTime = needs.forecastDate.getTime();
+            let closest = data.list[0];
+            let closestDiff = Math.abs(new Date(closest.dt * 1000).getTime() - targetTime);
+            for (const entry of data.list) {
+              const diff = Math.abs(new Date(entry.dt * 1000).getTime() - targetTime);
+              if (diff < closestDiff) {
+                closest = entry;
+                closestDiff = diff;
+              }
+            }
+            // Only show forecast if within ~6 days (avoid stale data)
+            if (closestDiff < 6 * 24 * 60 * 60 * 1000) {
+              const weatherInfo = {
+                temp: Math.round(closest.main.temp),
+                icon: closest.weather[0]?.icon,
+                description: closest.weather[0]?.description,
+                type: "forecast",
+              };
+              results[venue] = weatherInfo;
+              cacheRef.current[cacheKey] = { data: weatherInfo, timestamp: now };
+            }
+          }
         } catch {
           results[venue] = { error: true };
         }
@@ -940,7 +1017,7 @@ function useWeatherData(venues) {
     fetchWeather();
     const interval = setInterval(fetchWeather, WEATHER_CACHE_TTL);
     return () => clearInterval(interval);
-  }, [venues.join(",")]);
+  }, [eventKey]);
 
   return { weatherData, weatherLoading: loading };
 }
@@ -1607,14 +1684,13 @@ export default function CrociPortal() {
   const { notifications, unreadCount, markAllRead, markRead } = useNotifications(thisWeekEvents, dailySales);
   const { leafletLoaded, leafletError } = useLeafletLoader();
 
-  const allVenues = useMemo(() => {
-    const venues = new Set();
-    Object.values(thisWeekEvents).flat().forEach(e => venues.add(e.venue));
-    Object.values(nextWeekEvents).flat().forEach(e => venues.add(e.venue));
-    return [...venues];
+  const allEventsForWeather = useMemo(() => {
+    const thisWeek = thisWeekEvents["All"] || [];
+    const nextWeek = nextWeekEvents["All"] || [];
+    return [...thisWeek, ...nextWeek];
   }, [thisWeekEvents, nextWeekEvents]);
 
-  const { weatherData, weatherLoading } = useWeatherData(allVenues);
+  const { weatherData, weatherLoading } = useWeatherData(allEventsForWeather);
 
   const allThisWeekEvents = useMemo(() =>
     (thisWeekEvents["All"] || []).sort((a, b) => a.rawDate - b.rawDate),
@@ -1631,7 +1707,23 @@ export default function CrociPortal() {
   const totalSales = allEvents.reduce((s, e) => s + e.ticketsSold, 0);
   const liveCount = allEvents.filter(e => e.status === "live").length;
 
-  const thisWeekHeaders = ["Event", "Location", "Region", "Dates", "Status", "Sales / Target", "Staff", "CPA"];
+  const thisWeekHeaders = ["Event", "Location", "Region", "Dates", "Status", "Sales / Target", "Weather", "CPA"];
+
+  const groupedThisWeekEvents = useMemo(() => {
+    const allEvts = thisWeekEvents["All"] || [];
+    const groups = {};
+    CAMPAIGN_GROUPS.forEach(group => { groups[group] = []; });
+    groups["Other"] = [];
+    allEvts.forEach(event => {
+      const group = event.campaignGroup || "Other";
+      if (!groups[group]) groups[group] = [];
+      groups[group].push(event);
+    });
+    Object.values(groups).forEach(evts => {
+      evts.sort((a, b) => (a.rawDate || 0) - (b.rawDate || 0));
+    });
+    return Object.entries(groups).filter(([, evts]) => evts.length > 0);
+  }, [thisWeekEvents]);
 
   const kpis = [
     { label: "Live Events", value: liveCount, color: "#FF00B1", icon: "📡" },
@@ -1857,41 +1949,81 @@ export default function CrociPortal() {
                 </tr>
               </thead>
               <tbody>
-                {(thisWeekEvents["All"] || []).map((event, i) => {
-                  const currSym = getCurrencySymbol(event.country);
-                  return (
-                    <tr key={event.id} style={{ animation: `fadeUp 0.3s ease ${i * 0.05}s both`, transition: "background 0.2s ease", cursor: "default" }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = "#0d1117"}
-                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                    >
-                      <td style={{ padding: "12px 14px", fontSize: 13, fontWeight: 600, color: "#e2e8f0" }}>
-                        {event.name}
-                        {event.country === "Ireland" && <span style={{ marginLeft: 6, fontSize: 12 }}>{FLAGS["Ireland"]}</span>}
-                      </td>
-                      <td style={{ padding: "12px 14px", fontSize: 12, color: "#94a3b8" }}>{event.location || event.venue}</td>
-                      <td style={{ padding: "12px 14px", fontSize: 12, color: "#94a3b8" }}>{event.region}</td>
-                      <td style={{ padding: "12px 14px", fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap" }}>{event.date}</td>
-                      <td style={{ padding: "12px 14px" }}><StatusBadge status={event.status} /></td>
-                      <td style={{ padding: "12px 14px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 14, fontWeight: 700, color: "#3CB6BA", fontVariantNumeric: "tabular-nums" }}>{event.ticketsSold}</span>
-                          <span style={{ color: "#475569", fontSize: 12 }}>/ {event.target || "?"}</span>
-                          <ProgressBar value={event.ticketsSold} max={event.target || 1} color={event.target > 0 && event.ticketsSold >= event.target ? "#FF00B1" : "#3CB6BA"} />
-                        </div>
-                      </td>
-                      <td style={{ padding: "12px 14px" }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: event.uniqueAgents >= event.expectedStaff && event.expectedStaff > 0 ? "#FF00B1" : "#FBC500" }}>
-                          {event.staffFraction}
+                {groupedThisWeekEvents.map(([groupName, groupEvents]) => (
+                  <React.Fragment key={`group-${groupName}`}>
+                    <tr>
+                      <td
+                        colSpan={thisWeekHeaders.length}
+                        style={{
+                          padding: "12px 14px 6px",
+                          fontSize: 11,
+                          fontWeight: 800,
+                          color: CAMPAIGN_GROUP_COLORS[groupName] || "#64748b",
+                          textTransform: "uppercase",
+                          letterSpacing: 1.5,
+                          borderBottom: `2px solid ${(CAMPAIGN_GROUP_COLORS[groupName] || "#1e293b")}33`,
+                          fontFamily: "'Montserrat', sans-serif",
+                        }}
+                      >
+                        {groupName}
+                        <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 500, color: "#475569" }}>
+                          ({groupEvents.length} event{groupEvents.length !== 1 ? "s" : ""})
                         </span>
                       </td>
-                      <td style={{ padding: "12px 14px" }}>
-                        {event.cpa !== null
-                          ? <span style={{ fontSize: 13, fontWeight: 700, color: event.cpa <= 80 ? "#FF00B1" : event.cpa <= 150 ? "#FBC500" : "#ef4444", fontVariantNumeric: "tabular-nums" }}>{currSym}{event.cpa.toFixed(2)}</span>
-                          : <span style={{ color: "#475569", fontSize: 12 }}>--</span>}
-                      </td>
                     </tr>
-                  );
-                })}
+                    {groupEvents.map((event, i) => {
+                      const currSym = getCurrencySymbol(event.country);
+                      const w = weatherData[event.venue || event.location];
+                      return (
+                        <tr key={event.id} style={{ animation: `fadeUp 0.3s ease ${i * 0.05}s both`, transition: "background 0.2s ease", cursor: "default" }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = "#0d1117"}
+                          onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                        >
+                          <td style={{ padding: "12px 14px", fontSize: 13, fontWeight: 600, color: "#e2e8f0" }}>
+                            {event.name}
+                            {event.country === "Ireland" && <span style={{ marginLeft: 6, fontSize: 12 }}>{FLAGS["Ireland"]}</span>}
+                          </td>
+                          <td style={{ padding: "12px 14px", fontSize: 12, color: "#94a3b8" }}>{event.location || event.venue}</td>
+                          <td style={{ padding: "12px 14px", fontSize: 12, color: "#94a3b8" }}>{event.region}</td>
+                          <td style={{ padding: "12px 14px", fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap" }}>{event.date}</td>
+                          <td style={{ padding: "12px 14px" }}><StatusBadge status={event.status} /></td>
+                          <td style={{ padding: "12px 14px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <span style={{ fontSize: 14, fontWeight: 700, color: "#3CB6BA", fontVariantNumeric: "tabular-nums" }}>{event.ticketsSold}</span>
+                              <span style={{ color: "#475569", fontSize: 12 }}>/ {event.target || "?"}</span>
+                              <ProgressBar value={event.ticketsSold} max={event.target || 1} color={event.target > 0 && event.ticketsSold >= event.target ? "#FF00B1" : "#3CB6BA"} />
+                            </div>
+                          </td>
+                          <td style={{ padding: "12px 14px" }}>
+                            {!WEATHER_ENABLED ? (
+                              <span style={{ color: "#475569", fontSize: 12 }}>--</span>
+                            ) : weatherLoading && !w ? (
+                              <span style={{ color: "#475569", fontSize: 12 }}>...</span>
+                            ) : w && !w.error && w.icon ? (
+                              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                <img
+                                  src={`https://openweathermap.org/img/wn/${w.icon}@2x.png`}
+                                  alt={w.description || "weather"}
+                                  style={{ width: 22, height: 22 }}
+                                />
+                                <span style={{ fontSize: 12, fontWeight: 600, color: "#e2e8f0" }}>
+                                  {w.temp}°C
+                                </span>
+                              </div>
+                            ) : (
+                              <span style={{ color: "#475569", fontSize: 12 }}>--</span>
+                            )}
+                          </td>
+                          <td style={{ padding: "12px 14px" }}>
+                            {event.cpa !== null
+                              ? <span style={{ fontSize: 13, fontWeight: 700, color: event.cpa <= 80 ? "#FF00B1" : event.cpa <= 150 ? "#FBC500" : "#ef4444", fontVariantNumeric: "tabular-nums" }}>{currSym}{event.cpa.toFixed(2)}</span>
+                              : <span style={{ color: "#475569", fontSize: 12 }}>--</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </React.Fragment>
+                ))}
               </tbody>
             </table>
             {!USE_MOCK_DATA && (thisWeekEvents["All"] || []).length === 0 && (
