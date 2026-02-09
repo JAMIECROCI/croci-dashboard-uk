@@ -323,18 +323,23 @@ async function discoverSalesTabGids() {
   return { eventSalesTabs: [], tmmTabs: [] };
 }
 
-async function fetchAllSalesTabs(tabs) {
-  const csvPromises = tabs.map(async (tab) => {
-    const url = `${SALES_CSV_BASE_URL}?gid=${tab.gid}&single=true&output=csv`;
+async function fetchSingleTab(tab, retries = 2) {
+  const url = `${SALES_CSV_BASE_URL}?gid=${tab.gid}&single=true&output=csv`;
+  for (let attempt = 0; attempt <= retries; attempt++) {
     try {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 800 * attempt));
       const res = await fetch(url);
       if (!res.ok) {
-        console.warn(`Failed to fetch sales tab ${tab.name}: HTTP ${res.status}`);
-        return [];
+        console.warn(`Sales tab ${tab.name}: HTTP ${res.status} (attempt ${attempt + 1})`);
+        continue;
       }
       const text = await res.text();
+      // Validate response is CSV, not HTML error page
+      if (text.trimStart().startsWith("<")) {
+        console.warn(`Sales tab ${tab.name}: got HTML instead of CSV (attempt ${attempt + 1})`);
+        continue;
+      }
       const rows = parseCSV(text);
-      // Skip 3 header rows per tab (day headers, totals summary, column headers)
       return rows.slice(3).map(row => ({
         row,
         tabName: tab.name,
@@ -343,12 +348,27 @@ async function fetchAllSalesTabs(tabs) {
         weekNum: tab.weekNum,
       }));
     } catch (err) {
-      console.warn(`Error fetching sales tab ${tab.name}:`, err);
-      return [];
+      console.warn(`Sales tab ${tab.name}: error (attempt ${attempt + 1})`, err.message);
     }
-  });
-  const allTabRows = await Promise.all(csvPromises);
-  return allTabRows.flat();
+  }
+  console.warn(`Sales tab ${tab.name}: all ${retries + 1} attempts failed`);
+  return [];
+}
+
+async function fetchAllSalesTabs(tabs) {
+  // Batch requests (4 at a time) to avoid Google Sheets rate limiting
+  const BATCH_SIZE = 4;
+  const allResults = [];
+  for (let i = 0; i < tabs.length; i += BATCH_SIZE) {
+    const batch = tabs.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.all(batch.map(tab => fetchSingleTab(tab)));
+    allResults.push(...batchResults);
+    // Small delay between batches if more remain
+    if (i + BATCH_SIZE < tabs.length) {
+      await new Promise(r => setTimeout(r, 300));
+    }
+  }
+  return allResults.flat();
 }
 
 // ── Process Google Sheets Data (UK) ──────────────────────────────────
