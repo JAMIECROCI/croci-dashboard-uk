@@ -1,106 +1,121 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
 // ── Configuration ────────────────────────────────────────────────────
-const OPENWEATHER_API_KEY = "YOUR_API_KEY_HERE"; // Replace with your OpenWeatherMap API key
+const OPENWEATHER_API_KEY = "YOUR_API_KEY_HERE";
 const WEATHER_ENABLED = OPENWEATHER_API_KEY !== "YOUR_API_KEY_HERE";
-const WEATHER_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
-const USE_MOCK_DATA = false; // Set to true to use generated demo data
+const WEATHER_CACHE_TTL = 30 * 60 * 1000;
+const USE_MOCK_DATA = false;
 
-// ── Google Sheets Configuration ──────────────────────────────────────
-const MASTER_TRACKER_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfQ_GG1qM6ZsP2No7yQKRVmtb6UjccbcXp--jOIHEUC0bYUaN4opouQBixctbC6G-XVGZfGA28yIZ1/pub?gid=1256054786&single=true&output=csv";
-const SALES_SPREADSHEET_ID = "1pKRWsY_BZpR52k7DZWsc0WfKW1f9LVmM_USQaK6jOQg";
-const SALES_PUBHTML_URL = `https://docs.google.com/spreadsheets/d/${SALES_SPREADSHEET_ID}/pubhtml`;
-const SALES_CSV_BASE_URL = `https://docs.google.com/spreadsheets/d/${SALES_SPREADSHEET_ID}/pub`;
-const REFRESH_INTERVAL = 2.5 * 60 * 1000; // 2.5 minutes
+// ── Google Sheets Configuration (UK) ─────────────────────────────────
+const MASTER_TRACKER_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSl_qewLiD5ZN1BOMxHJlTUUe2jt1bohmSjiJ9hPEHJN2YvNvZzghKO5Mix-IgiudjAR-rGwFCctzC/pub?gid=0&single=true&output=csv";
+const SALES_PUBHTML_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSjExpxy5r3r3hWi4Oe1ne8u_tu0BVqPzRPWIh0k2zwsgR0btJu1gbXHZoDp97Gz8AE0d3Ms9CeD1rL/pubhtml";
+const SALES_CSV_BASE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSjExpxy5r3r3hWi4Oe1ne8u_tu0BVqPzRPWIh0k2zwsgR0btJu1gbXHZoDp97Gz8AE0d3Ms9CeD1rL/pub";
+const REFRESH_INTERVAL = 2.5 * 60 * 1000;
 
-// ── Map Region Configuration ─────────────────────────────────────────
+// ── Map Region Configuration (UK & Ireland only) ─────────────────────
 const MAP_REGIONS = {
-  US: { center: [39.8, -98.5], zoom: 4, label: "North America" },
   UK: { center: [54.0, -4.0], zoom: 5, label: "UK & Ireland" },
+  IE: { center: [53.3, -7.5], zoom: 6.5, label: "Ireland" },
 };
-const MAP_ROTATION_INTERVAL = 20000; // 20 seconds
+const MAP_ROTATION_INTERVAL = 20000;
 
 // ── Password Protection ─────────────────────────────────────────────
 const PASSWORD_PROTECTED = true;
 const SITE_PASSWORD = "CrociTeam2025";
 
-// ── Venue Coordinate Registry (Mock) ─────────────────────────────────
-const VENUE_COORDINATES_MOCK = {
+// ── Venue Coordinate Registry (UK & Ireland) ─────────────────────────
+const VENUE_COORDINATES = {
+  // UK venues
   "The O2 Arena, London": { lat: 51.5033, lng: 0.0032 },
   "Manchester Central": { lat: 53.4762, lng: -2.2467 },
   "NEC Birmingham": { lat: 52.4539, lng: -1.7246 },
+  "NEC": { lat: 52.4539, lng: -1.7246 },
   "SEC Glasgow": { lat: 55.8607, lng: -4.2872 },
   "Olympia London": { lat: 51.4960, lng: -0.2098 },
   "ExCeL London": { lat: 51.5085, lng: 0.0295 },
+  "ExCeL": { lat: 51.5085, lng: 0.0295 },
   "Brighton Centre": { lat: 50.8218, lng: -0.1392 },
+  "EventCity Manchester": { lat: 53.4680, lng: -2.3474 },
+  "AECC Aberdeen": { lat: 57.1647, lng: -2.0863 },
+  "P&J Live": { lat: 57.1647, lng: -2.0863 },
+  "Edinburgh International Conference Centre": { lat: 55.9476, lng: -3.2069 },
+  "EICC": { lat: 55.9476, lng: -3.2069 },
+  "ICC Wales": { lat: 51.5866, lng: -2.9938 },
+  "Arena Birmingham": { lat: 52.4801, lng: -1.9083 },
+  "London Olympia": { lat: 51.4960, lng: -0.2098 },
+  "Farnborough International": { lat: 51.2758, lng: -0.7702 },
+  "Harrogate Convention Centre": { lat: 53.9926, lng: -1.5345 },
+  "Telford International Centre": { lat: 52.6793, lng: -2.4489 },
+  "Yorkshire Event Centre": { lat: 53.9930, lng: -1.5370 },
+  "Sandown Park": { lat: 51.3764, lng: -0.3567 },
+  "Stoneleigh Park": { lat: 52.3558, lng: -1.5109 },
+  "NAEC Stoneleigh": { lat: 52.3558, lng: -1.5109 },
+  "Bath & West Showground": { lat: 51.1454, lng: -2.7093 },
+  "Three Counties Showground": { lat: 52.0566, lng: -2.2373 },
+  "Kent Event Centre": { lat: 51.2547, lng: 0.5376 },
+  "Kent Showground": { lat: 51.2547, lng: 0.5376 },
+  "Royal Highland Centre": { lat: 55.9412, lng: -3.3810 },
+  "Alexandra Palace": { lat: 51.5936, lng: -0.1306 },
+  "Olympia Grand": { lat: 51.4960, lng: -0.2098 },
+  "ICC Birmingham": { lat: 52.4796, lng: -1.9085 },
+  "Liverpool Arena": { lat: 53.3960, lng: -2.9874 },
+  "M&S Bank Arena": { lat: 53.3960, lng: -2.9874 },
+  "Leeds First Direct Arena": { lat: 53.7985, lng: -1.5490 },
+  "Motorpoint Arena Nottingham": { lat: 52.9504, lng: -1.1428 },
+  "Bournemouth International Centre": { lat: 50.7173, lng: -1.8741 },
+  "BIC": { lat: 50.7173, lng: -1.8741 },
+  "Cardiff City Hall": { lat: 51.4837, lng: -3.1764 },
+  "Westpoint Exeter": { lat: 50.7058, lng: -3.4760 },
+  "Great Yorkshire Showground": { lat: 53.9930, lng: -1.5370 },
+  "FIVE": { lat: 51.5085, lng: 0.0295 },
+  // Ireland venues
   "RDS Dublin": { lat: 53.3270, lng: -6.2290 },
   "Cork City Hall": { lat: 51.8969, lng: -8.4707 },
   "Galway Racecourse": { lat: 53.2830, lng: -8.9890 },
   "Convention Centre Dublin": { lat: 53.3478, lng: -6.2388 },
+  "CCD": { lat: 53.3478, lng: -6.2388 },
   "Limerick Milk Market": { lat: 52.6610, lng: -8.6303 },
-  "Javits Center, NYC": { lat: 40.7575, lng: -74.0021 },
-  "McCormick Place, Chicago": { lat: 41.8517, lng: -87.6155 },
-  "LA Convention Center": { lat: 34.0400, lng: -118.2696 },
-  "Georgia World Congress, Atlanta": { lat: 33.7590, lng: -84.3957 },
-  "Boston Convention Center": { lat: 42.3456, lng: -71.0446 },
+  "Citywest Hotel": { lat: 53.2920, lng: -6.4322 },
+  "Croke Park": { lat: 53.3633, lng: -6.2514 },
+  "Leopardstown Racecourse": { lat: 53.2668, lng: -6.2056 },
+  "Thomond Park": { lat: 52.6629, lng: -8.6259 },
+  "3Arena Dublin": { lat: 53.3478, lng: -6.2276 },
+  "Punchestown Racecourse": { lat: 53.1810, lng: -6.6744 },
+  "Wexford Racecourse": { lat: 52.3420, lng: -6.4578 },
 };
 
-// ── Venue Coordinates (Live US Data) ─────────────────────────────────
-const VENUE_COORDINATES_LIVE = {
-  "I-X Center": { lat: 41.4120, lng: -81.7385 },
-  "Huntington Convention Center of Cleveland": { lat: 41.4993, lng: -81.6944 },
-  "Charlotte Convention Center": { lat: 35.2208, lng: -80.8439 },
-  "Connecticut Convention Center": { lat: 41.7668, lng: -72.6734 },
-  "Ohio State Fairgrounds": { lat: 40.0076, lng: -82.9988 },
-  "Kentucky Exposition Center": { lat: 38.1941, lng: -85.7415 },
-  "Boston Convention & Exhibition Center": { lat: 42.3456, lng: -71.0446 },
-  "Vale Fieldhouse": { lat: 41.7658, lng: -72.6734 },
-  "Northern Kentucky Convention Center": { lat: 39.0812, lng: -84.5085 },
-  "Pennsylvania Convention Center": { lat: 39.9546, lng: -75.1593 },
-  "Meadowlands Expo Center": { lat: 40.7863, lng: -74.0712 },
-  "Donald E. Stephens Convention Center": { lat: 41.9773, lng: -87.8603 },
-  "Greater Philadelphia Expo Center @ Oaks": { lat: 40.1318, lng: -75.4518 },
-  "Indiana State Fairgrounds": { lat: 39.8271, lng: -86.1185 },
-  "Greater Fort Lauderdale Broward County Convention Center": { lat: 26.0985, lng: -80.1261 },
-  "Dulles Expo Center": { lat: 38.9565, lng: -77.4483 },
-  "Georgia World Congress Center": { lat: 33.7590, lng: -84.3957 },
-  "Ocean Center": { lat: 29.2117, lng: -81.0239 },
-  "New Jersey Convention & Expo Center": { lat: 40.6584, lng: -74.1760 },
-  "Suburban Collection Showplace": { lat: 42.5252, lng: -83.3644 },
-  "Devos Place": { lat: 42.9664, lng: -85.6781 },
-  "Kalamazoo County Expo Center": { lat: 42.2756, lng: -85.5720 },
-  "Monroeville Convention Center": { lat: 40.4278, lng: -79.7612 },
-  "Walter E Washington Convention Center": { lat: 38.9029, lng: -77.0228 },
-  "Greater Columbus Convention Center": { lat: 39.9712, lng: -82.9961 },
-  "Miami Beach Convention Center": { lat: 25.7954, lng: -80.1340 },
-  "Tampa Convention Center": { lat: 27.9428, lng: -82.4580 },
-  "Javits Center": { lat: 40.7575, lng: -74.0021 },
+// ── UK Region Coordinates (fallback by region name) ──────────────────
+const REGION_COORDINATES = {
+  "London": { lat: 51.5074, lng: -0.1278 },
+  "South East": { lat: 51.3, lng: 0.5 },
+  "South West": { lat: 50.9, lng: -3.2 },
+  "East Anglia": { lat: 52.5, lng: 1.0 },
+  "East Midlands": { lat: 52.8, lng: -1.2 },
+  "West Midlands": { lat: 52.5, lng: -1.9 },
+  "North West": { lat: 53.6, lng: -2.5 },
+  "North East": { lat: 54.9, lng: -1.6 },
+  "Yorkshire": { lat: 53.9, lng: -1.5 },
+  "Wales": { lat: 52.1, lng: -3.6 },
+  "Scotland": { lat: 56.5, lng: -4.2 },
+  "Northern Ireland": { lat: 54.6, lng: -6.7 },
+  "Ireland": { lat: 53.3, lng: -7.5 },
+  "Dublin": { lat: 53.3498, lng: -6.2603 },
+  "Cork": { lat: 51.8969, lng: -8.4863 },
+  "Galway": { lat: 53.2707, lng: -9.0568 },
+  "Limerick": { lat: 52.6638, lng: -8.6267 },
 };
 
-// ── US State Center Coordinates (fallback) ──────────────────────────
-const STATE_COORDINATES = {
-  OH: { lat: 40.42, lng: -82.91 }, FL: { lat: 27.66, lng: -81.52 },
-  NC: { lat: 35.76, lng: -79.02 }, VA: { lat: 37.43, lng: -78.66 },
-  CT: { lat: 41.60, lng: -72.76 }, PA: { lat: 41.20, lng: -77.19 },
-  NJ: { lat: 40.06, lng: -74.41 }, NY: { lat: 42.17, lng: -74.95 },
-  IL: { lat: 40.63, lng: -89.40 }, IN: { lat: 40.27, lng: -86.13 },
-  KY: { lat: 37.84, lng: -84.27 }, MA: { lat: 42.41, lng: -71.38 },
-  GA: { lat: 33.75, lng: -84.39 }, CA: { lat: 36.78, lng: -119.42 },
-  MI: { lat: 44.31, lng: -84.36 }, MD: { lat: 39.05, lng: -76.64 },
-  TX: { lat: 31.97, lng: -99.90 }, DC: { lat: 38.91, lng: -77.04 },
-  WI: { lat: 43.78, lng: -88.79 }, MN: { lat: 46.73, lng: -94.69 },
-  TN: { lat: 35.52, lng: -86.58 }, SC: { lat: 33.84, lng: -81.16 },
-  CO: { lat: 39.55, lng: -105.78 }, AZ: { lat: 34.05, lng: -111.09 },
-  WA: { lat: 47.75, lng: -120.74 }, OR: { lat: 43.80, lng: -120.55 },
-  MO: { lat: 38.57, lng: -92.60 }, AL: { lat: 32.32, lng: -86.90 },
-  LA: { lat: 30.98, lng: -91.96 }, NV: { lat: 38.80, lng: -116.42 },
-};
+// ── Active Countries ─────────────────────────────────────────────────
+const COUNTRIES = ["United Kingdom", "Ireland"];
+const ACTIVE_COUNTRIES = COUNTRIES;
+const FLAGS = { "United Kingdom": "\u{1F1EC}\u{1F1E7}", "Ireland": "\u{1F1EE}\u{1F1EA}" };
 
-const ALL_VENUE_COORDINATES = { ...VENUE_COORDINATES_MOCK, ...VENUE_COORDINATES_LIVE };
+// ── Currency Helper ──────────────────────────────────────────────────
+function getCurrencySymbol(country) {
+  return country === "Ireland" ? "\u20ac" : "\u00a3";
+}
 
-// ── Mock Data Constants ──────────────────────────────────────────────
-const COUNTRIES = ["United Kingdom", "Ireland", "United States"];
-const ACTIVE_COUNTRIES = USE_MOCK_DATA ? COUNTRIES : ["United States"];
+// ── Mock Data Constants (not used in live mode) ──────────────────────
 const CAMPAIGNS = ["Spring Wellness Push", "Summer Box Blitz", "Pet Nutrition Drive", "Starter Kit Promo"];
 const PRODUCTS = {
   feedingPlans: ["Puppy Growth Plan", "Adult Maintenance", "Senior Vitality", "Weight Management", "Raw Boost"],
@@ -108,14 +123,10 @@ const PRODUCTS = {
 };
 const NAMES_UK = ["James Hartley", "Sophie Brennan", "Liam O'Connor", "Chloe Watts", "Aiden Clarke", "Megan Taylor", "Ryan Patel", "Emma Hughes", "Nathan Brooks", "Isla Ferreira"];
 const NAMES_IE = ["Ciara Murphy", "Sean Gallagher", "Niamh Doyle", "Conor Byrne", "Aoife Kelly", "Padraig Walsh", "Sinead Nolan", "Declan Healy", "Roisin Daly", "Eoin Fitzgerald"];
-const NAMES_US = ["Marcus Johnson", "Ashley Rivera", "Tyler Chen", "Brittany Williams", "Jordan Campbell", "Kayla Nguyen", "Brandon Mitchell", "Samantha Hayes", "Derek Morales", "Megan Foster"];
-const SALES_NAMES = { "United Kingdom": NAMES_UK, "Ireland": NAMES_IE, "United States": NAMES_US };
-const FLAGS = { "United Kingdom": "🇬🇧", "Ireland": "🇮🇪", "United States": "🇺🇸" };
-
+const SALES_NAMES = { "United Kingdom": NAMES_UK, "Ireland": NAMES_IE };
 const VENUES_UK = ["The O2 Arena, London", "Manchester Central", "NEC Birmingham", "SEC Glasgow", "Olympia London", "ExCeL London", "Brighton Centre"];
 const VENUES_IE = ["RDS Dublin", "Cork City Hall", "Galway Racecourse", "Convention Centre Dublin", "Limerick Milk Market"];
-const VENUES_US = ["Javits Center, NYC", "McCormick Place, Chicago", "LA Convention Center", "Georgia World Congress, Atlanta", "Boston Convention Center"];
-const VENUES = { "United Kingdom": VENUES_UK, "Ireland": VENUES_IE, "United States": VENUES_US };
+const VENUES = { "United Kingdom": VENUES_UK, "Ireland": VENUES_IE };
 
 // ── Utility Functions ────────────────────────────────────────────────
 function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
@@ -174,13 +185,44 @@ function parseMasterDate(str) {
   return new Date(2026, month, day);
 }
 
-function parseSalesDate(str) {
-  if (!str) return null;
-  const parts = str.split("-");
-  if (parts.length !== 3) return null;
-  const [mm, dd, yyyy] = parts.map(Number);
-  if (!mm || !dd || !yyyy) return null;
-  return new Date(yyyy, mm - 1, dd);
+// UK Sales date format: "2026-02-02 17:48:07"
+function parseUKSalesDate(str) {
+  if (!str || typeof str !== "string") return null;
+  const trimmed = str.trim();
+  // YYYY-MM-DD HH:MM:SS
+  const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/);
+  if (match) {
+    return new Date(
+      parseInt(match[1], 10),
+      parseInt(match[2], 10) - 1,
+      parseInt(match[3], 10),
+      parseInt(match[4], 10),
+      parseInt(match[5], 10),
+      parseInt(match[6], 10)
+    );
+  }
+  // Fallback: try YYYY-MM-DD only
+  const match2 = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match2) {
+    return new Date(parseInt(match2[1], 10), parseInt(match2[2], 10) - 1, parseInt(match2[3], 10));
+  }
+  return null;
+}
+
+// Extract UK agent: check col1 and col2, use whichever isn't "*Not Listed"
+function extractUKAgent(col1, col2) {
+  const a1 = (col1 || "").trim();
+  const a2 = (col2 || "").trim();
+  if (a1 && a1 !== "*Not Listed" && a1 !== "") return a1;
+  if (a2 && a2 !== "*Not Listed" && a2 !== "") return a2;
+  return "Unknown";
+}
+
+// Normalize week number: "WK 1" → "WK1", "WK 06" → "WK6"
+function normalizeWeekNum(str) {
+  if (!str) return "";
+  const match = str.match(/WK\s*0?(\d+)/i);
+  return match ? `WK${match[1]}` : str.trim();
 }
 
 function parseNumber(str) {
@@ -189,9 +231,10 @@ function parseNumber(str) {
   return parseFloat(cleaned) || 0;
 }
 
-function parseCurrency(str) {
+// Parse £ currency: strip £, commas → float
+function parsePoundCurrency(str) {
   if (!str) return 0;
-  const cleaned = String(str).replace(/[$,\s]/g, "");
+  const cleaned = String(str).replace(/[\u00a3\u20ac$,\s]/g, "");
   return parseFloat(cleaned) || 0;
 }
 
@@ -211,50 +254,53 @@ function getWeekSunday(monday) {
   return d;
 }
 
-function extractStateAbbrev(stateStr) {
-  if (!stateStr) return null;
-  const match = stateStr.match(/[A-Z]{2}/);
-  return match ? match[0] : null;
-}
-
-function formatDateForSales(date) {
+function formatDateForUKSales(date) {
+  const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, "0");
   const dd = String(date.getDate()).padStart(2, "0");
-  return `${mm}-${dd}-${date.getFullYear()}`;
+  return `${yyyy}-${mm}-${dd}`;
 }
 
-// ── Sales Tab Discovery ──────────────────────────────────────────────
+// ── Sales Tab Discovery (UK: campaign-based tabs) ────────────────────
 async function discoverSalesTabGids() {
   try {
     const response = await fetch(SALES_PUBHTML_URL);
     if (!response.ok) throw new Error(`pubhtml HTTP ${response.status}`);
     const html = await response.text();
 
-    // Parse sheet-button elements: <li id="sheet-button-1246014827">...<a>WK3</a>...</li>
     const tabPattern = /id="sheet-button-(\d+)"[\s\S]*?<a[^>]*>([^<]+)<\/a>/gi;
-    const tabs = [];
+    const eventSalesTabs = [];
+    const tmmTabs = [];
     let match;
+
     while ((match = tabPattern.exec(html)) !== null) {
       const gid = match[1];
       const name = match[2].trim();
-      if (/^WK\d+$/i.test(name)) {
-        tabs.push({ gid, name });
+
+      // Extract week number from tab name like "WK 06 - HF/GC UK"
+      const weekMatch = name.match(/WK\s*(\d+)/i);
+      if (!weekMatch) continue;
+      const weekNum = `WK${parseInt(weekMatch[1], 10)}`;
+
+      // Categorize
+      if (/TMM|TELESALES/i.test(name)) {
+        tmmTabs.push({ gid, name, weekNum, campaign: "TMM Telesales", country: "United Kingdom" });
+      } else if (/HF\s*IE/i.test(name)) {
+        eventSalesTabs.push({ gid, name, weekNum, campaign: "HF IE", country: "Ireland" });
+      } else if (/HF[\s/]*GC\s*UK/i.test(name)) {
+        eventSalesTabs.push({ gid, name, weekNum, campaign: "HF/GC UK", country: "United Kingdom" });
+      } else if (/TAILS/i.test(name)) {
+        eventSalesTabs.push({ gid, name, weekNum, campaign: "Tails.com", country: "United Kingdom" });
       }
     }
 
-    if (tabs.length > 0) return tabs;
-
-    // Fallback regex for alternative HTML structures
-    const altPattern = /gid=(\d+)[^"]*"[^>]*>([^<]*WK\d+[^<]*)</gi;
-    while ((match = altPattern.exec(html)) !== null) {
-      tabs.push({ gid: match[1], name: match[2].trim() });
+    if (eventSalesTabs.length > 0 || tmmTabs.length > 0) {
+      return { eventSalesTabs, tmmTabs };
     }
-    if (tabs.length > 0) return tabs;
   } catch (err) {
-    console.warn("Sales tab discovery failed, using fallback:", err);
+    console.warn("Sales tab discovery failed:", err);
   }
-  // Fallback: return the known WK6 tab
-  return [{ gid: "250023368", name: "WK6" }];
+  return { eventSalesTabs: [], tmmTabs: [] };
 }
 
 async function fetchAllSalesTabs(tabs) {
@@ -268,7 +314,14 @@ async function fetchAllSalesTabs(tabs) {
       }
       const text = await res.text();
       const rows = parseCSV(text);
-      return rows.slice(2); // Skip 2 header rows per tab
+      // Skip 2 header rows per tab, attach metadata
+      return rows.slice(2).map(row => ({
+        row,
+        tabName: tab.name,
+        campaign: tab.campaign,
+        country: tab.country,
+        weekNum: tab.weekNum,
+      }));
     } catch (err) {
       console.warn(`Error fetching sales tab ${tab.name}:`, err);
       return [];
@@ -278,73 +331,79 @@ async function fetchAllSalesTabs(tabs) {
   return allTabRows.flat();
 }
 
-// ── Process Google Sheets Data ───────────────────────────────────────
-function processData(masterRows, salesRows, selectedWeek, salesPreStripped = false) {
-  // Parse Master Tracker — skip first 3 blank/header rows, row 3 is the real header
-  const masterData = masterRows.slice(4);
+// ── Process Google Sheets Data (UK) ──────────────────────────────────
+function processDataUK(masterRows, salesDataRows, tmmSalesRows, selectedWeek) {
+  // Parse UK Master Tracker — skip 1 header row
+  const masterData = masterRows.slice(1);
 
   const events = masterData
     .filter(row => {
-      if (!row || row.length < 17) return false;
+      if (!row || row.length < 10) return false;
       const bookingStatus = (row[2] || "").trim().toUpperCase();
-      const eventName = (row[11] || "").trim();
+      const showName = (row[7] || "").trim();
       if (bookingStatus !== "BOOKED") return false;
-      if (!eventName || eventName.toUpperCase().includes("WEEK BREAK")) return false;
+      if (!showName || showName.toUpperCase().includes("WEEK BREAK")) return false;
       return true;
     })
-    .map((row, index) => ({
-      id: `event-${index}`,
-      client: (row[3] || "").trim(),
-      weekNum: (row[4] || "").trim(),
-      month: (row[5] || "").trim(),
-      startDate: parseMasterDate(row[6]),
-      endDate: parseMasterDate(row[7]),
-      startDateRaw: (row[6] || "").trim(),
-      endDateRaw: (row[7] || "").trim(),
-      liveDays: parseNumber(row[8]),
-      eventType: (row[10] || "").trim(),
-      eventName: (row[11] || "").trim(),
-      location: (row[12] || "").trim(),
-      state: (row[13] || "").trim(),
-      salesTarget: parseNumber(row[15]),
-      masterSales: parseNumber(row[16]),
-      expectedStaff: parseNumber(row[20]),
-      totalUpfronts: parseCurrency(row[36]),
-      country: "United States",
-    }));
+    .map((row, index) => {
+      const spaceCost = parsePoundCurrency(row[29]);
+      const logistics = parsePoundCurrency(row[30]);
+      const totalUpfronts = spaceCost + logistics;
 
-  // Parse Sales Entries — skip headers if not pre-stripped
-  const rawSalesRows = salesPreStripped ? salesRows : salesRows.slice(2);
-  const salesData = rawSalesRows
-    .filter(row => row && row.length >= 7)
-    .map(row => {
-      const agentField = (row[1] || "").trim();
-      const agentParts = agentField.split(/\t/);
       return {
-        date: parseSalesDate(row[0]),
+        id: `event-${index}`,
+        client: (row[6] || "").trim(),
+        weekNum: normalizeWeekNum(row[3]),
+        startDate: parseMasterDate(row[4]),
+        endDate: parseMasterDate(row[5]),
+        startDateRaw: (row[4] || "").trim(),
+        endDateRaw: (row[5] || "").trim(),
+        liveDays: parseNumber(row[17]),
+        showName: (row[7] || "").trim(),
+        eventName: (row[7] || "").trim(),
+        location: (row[8] || "").trim(),
+        region: (row[9] || "").trim(),
+        expectedStaff: parseNumber(row[18]),
+        salesTarget: parseNumber(row[25]),
+        masterSales: parseNumber(row[26]),
+        spaceCost,
+        logistics,
+        totalUpfronts,
+        country: "United Kingdom", // default, may be overridden by sales data
+      };
+    });
+
+  // Parse UK Sales Entries
+  const salesData = salesDataRows
+    .filter(item => item && item.row && item.row.length >= 4)
+    .map(item => {
+      const row = item.row;
+      return {
+        date: parseUKSalesDate(row[0]),
         dateRaw: (row[0] || "").trim(),
-        agentCode: (agentParts[0] || "").trim(),
-        agentName: (agentParts[1] || agentParts[0] || "Unknown").trim(),
-        eventName: (row[2] || "").trim(),
-        paymentCompleted: (row[6] || "").trim().toUpperCase(),
+        agentName: extractUKAgent(row[1], row[2]),
+        location: (row[3] || "").trim(), // JOIN KEY: matches showName
+        campaign: item.campaign,
+        country: item.country,
+        weekNum: item.weekNum,
+        tabName: item.tabName,
       };
     })
-    .filter(s => s.paymentCompleted === "YES" && s.date);
+    .filter(s => s.date && s.location);
 
-  // Group sales by event name (case-insensitive)
-  const salesByEvent = {};
+  // Group sales by location (join key, case-insensitive)
+  const salesByLocation = {};
   salesData.forEach(sale => {
-    const key = sale.eventName.toLowerCase();
-    if (!salesByEvent[key]) salesByEvent[key] = [];
-    salesByEvent[key].push(sale);
+    const key = sale.location.toLowerCase();
+    if (!salesByLocation[key]) salesByLocation[key] = [];
+    salesByLocation[key].push(sale);
   });
 
   // Join: compute live stats for each event (DATE-FILTERED)
   events.forEach(event => {
-    const key = event.eventName.toLowerCase();
-    const allEventSales = salesByEvent[key] || [];
+    const key = event.showName.toLowerCase();
+    const allEventSales = salesByLocation[key] || [];
 
-    // Filter sales to only those within this event's date range
     let eventSales;
     if (event.startDate && event.endDate) {
       const rangeStart = new Date(event.startDate);
@@ -356,23 +415,27 @@ function processData(masterRows, salesRows, selectedWeek, salesPreStripped = fal
         return sale.date >= rangeStart && sale.date <= rangeEnd;
       });
     } else {
-      eventSales = allEventSales; // fallback if no dates
+      eventSales = allEventSales;
     }
 
+    // Detect country from sales data (if HF IE tab, it's Ireland)
+    const hasIrishSales = eventSales.some(s => s.country === "Ireland");
+    if (hasIrishSales) event.country = "Ireland";
+
     event.liveSalesCount = eventSales.length;
-    event.uniqueAgentCodes = new Set(eventSales.map(s => s.agentCode));
-    event.uniqueAgents = event.uniqueAgentCodes.size;
+    event.uniqueAgentNames = new Set(eventSales.map(s => s.agentName));
+    event.uniqueAgents = event.uniqueAgentNames.size;
     event.staffFraction = `${event.uniqueAgents} / ${event.expectedStaff || "?"}`;
     event.cpa = event.liveSalesCount > 0 ? (event.totalUpfronts / event.liveSalesCount) : null;
-    event._filteredSales = eventSales; // store for leaderboard reuse
+    event._filteredSales = eventSales;
   });
 
-  // Merge duplicate events within the same week (e.g. two booths at same show)
+  // Merge duplicate events within the same week
   const mergeMap = {};
   events.forEach(event => {
-    const mergeKey = `${event.eventName.toLowerCase()}|||${event.weekNum}`;
+    const mergeKey = `${event.showName.toLowerCase()}|||${event.weekNum}`;
     if (!mergeMap[mergeKey]) {
-      mergeMap[mergeKey] = { ...event, uniqueAgentCodes: new Set(event.uniqueAgentCodes || []) };
+      mergeMap[mergeKey] = { ...event, uniqueAgentNames: new Set(event.uniqueAgentNames || []) };
     } else {
       const merged = mergeMap[mergeKey];
       merged.salesTarget += event.salesTarget || 0;
@@ -380,11 +443,9 @@ function processData(masterRows, salesRows, selectedWeek, salesPreStripped = fal
       merged.totalUpfronts += event.totalUpfronts || 0;
       merged.masterSales += event.masterSales || 0;
       merged.liveDays = Math.max(merged.liveDays || 0, event.liveDays || 0);
-      // Combine unique agent sets (sales are already counted once per event name, so no double-counting)
-      if (event.uniqueAgentCodes) {
-        event.uniqueAgentCodes.forEach(code => merged.uniqueAgentCodes.add(code));
+      if (event.uniqueAgentNames) {
+        event.uniqueAgentNames.forEach(name => merged.uniqueAgentNames.add(name));
       }
-      // Use earliest start date and latest end date for the combined event
       if (event.startDate && (!merged.startDate || event.startDate < merged.startDate)) {
         merged.startDate = event.startDate;
         merged.startDateRaw = event.startDateRaw;
@@ -396,9 +457,8 @@ function processData(masterRows, salesRows, selectedWeek, salesPreStripped = fal
     }
   });
 
-  // Recalculate derived fields for merged events and build final array
   const mergedEvents = Object.values(mergeMap).map(event => {
-    event.uniqueAgents = event.uniqueAgentCodes.size;
+    event.uniqueAgents = event.uniqueAgentNames.size;
     event.staffFraction = `${event.uniqueAgents} / ${event.expectedStaff || "?"}`;
     event.liveSalesCount = event.liveSalesCount || 0;
     event.cpa = event.liveSalesCount > 0 ? (event.totalUpfronts / event.liveSalesCount) : null;
@@ -437,17 +497,18 @@ function processData(masterRows, salesRows, selectedWeek, salesPreStripped = fal
   // Build leaderboard from date-filtered sales
   const weekSalesForLeaderboard = thisWeekEvts.flatMap(e => e._filteredSales || []);
 
-  const todayStr = formatDateForSales(today);
-  const todaySalesForLeaderboard = weekSalesForLeaderboard.filter(s => s.dateRaw === todayStr);
+  const todayStr = formatDateForUKSales(today);
+  const todaySalesForLeaderboard = weekSalesForLeaderboard.filter(s => s.dateRaw && s.dateRaw.startsWith(todayStr));
 
   function buildLeaderboard(salesList) {
     const byEvent = {};
     salesList.forEach(sale => {
-      if (!byEvent[sale.eventName]) byEvent[sale.eventName] = {};
-      if (!byEvent[sale.eventName][sale.agentName]) {
-        byEvent[sale.eventName][sale.agentName] = 0;
+      const eventKey = sale.location || "Unknown";
+      if (!byEvent[eventKey]) byEvent[eventKey] = {};
+      if (!byEvent[eventKey][sale.agentName]) {
+        byEvent[eventKey][sale.agentName] = 0;
       }
-      byEvent[sale.eventName][sale.agentName]++;
+      byEvent[eventKey][sale.agentName]++;
     });
 
     return Object.entries(byEvent).map(([eventName, agents]) => ({
@@ -463,6 +524,23 @@ function processData(masterRows, salesRows, selectedWeek, salesPreStripped = fal
   const dailyLeaderboard = buildLeaderboard(todaySalesForLeaderboard);
   const weeklyLeaderboard = buildLeaderboard(weekSalesForLeaderboard);
 
+  // Process TMM Telesales separately
+  const tmmSales = tmmSalesRows
+    .filter(item => item && item.row && item.row.length >= 2)
+    .map(item => {
+      const row = item.row;
+      return {
+        date: parseUKSalesDate(row[0]),
+        dateRaw: (row[0] || "").trim(),
+        agentName: extractUKAgent(row[1], row[2]),
+        weekNum: item.weekNum,
+      };
+    })
+    .filter(s => s.date);
+
+  const tmmTodayCount = tmmSales.filter(s => s.dateRaw && s.dateRaw.startsWith(todayStr)).length;
+  const tmmWeekCount = tmmSales.filter(s => s.weekNum === activeWeek).length;
+
   // Transform events to dashboard shape
   function toEventShape(event) {
     let status = "upcoming";
@@ -473,10 +551,10 @@ function processData(masterRows, salesRows, selectedWeek, salesPreStripped = fal
 
     return {
       id: event.id,
-      name: event.eventName,
+      name: event.showName,
       venue: event.location,
       location: event.location,
-      state: event.state,
+      region: event.region,
       date: `${event.startDateRaw} - ${event.endDateRaw}`,
       rawDate: event.startDate || new Date(),
       ticketsSold: event.liveSalesCount,
@@ -484,7 +562,7 @@ function processData(masterRows, salesRows, selectedWeek, salesPreStripped = fal
       target: event.salesTarget,
       status,
       campaign: event.client,
-      country: "United States",
+      country: event.country,
       staffFraction: event.staffFraction,
       uniqueAgents: event.uniqueAgents,
       expectedStaff: event.expectedStaff,
@@ -493,31 +571,53 @@ function processData(masterRows, salesRows, selectedWeek, salesPreStripped = fal
       salesTarget: event.salesTarget,
       masterSales: event.masterSales,
       weekNum: event.weekNum,
-      eventType: event.eventType,
     };
   }
 
-  // Build recent sales for live ticker (from current week's date-filtered sales)
+  // Build by-country and "All" views
+  const thisWeekShaped = thisWeekEvts.map(toEventShape);
+  const nextWeekShaped = nextWeekEvts.map(toEventShape);
+
+  const ukEvents = thisWeekShaped.filter(e => e.country === "United Kingdom");
+  const ieEvents = thisWeekShaped.filter(e => e.country === "Ireland");
+  const nextUkEvents = nextWeekShaped.filter(e => e.country === "United Kingdom");
+  const nextIeEvents = nextWeekShaped.filter(e => e.country === "Ireland");
+
+  // Build recent sales for live ticker
   const recentSales = weekSalesForLeaderboard
     .sort((a, b) => (b.date || 0) - (a.date || 0))
     .slice(0, 20)
     .map((sale, i) => ({
       id: `sale-${i}-${sale.dateRaw}`,
-      eventName: sale.eventName,
-      venue: sale.eventName,
+      eventName: sale.location,
+      venue: sale.location,
       agentName: sale.agentName,
       product: sale.agentName,
       amount: 0,
       time: sale.dateRaw,
+      country: sale.country,
     }));
 
   return {
     data: {
-      thisWeekEvents: { "United States": thisWeekEvts.map(toEventShape) },
-      nextWeekEvents: { "United States": nextWeekEvts.map(toEventShape) },
-      dailySales: { "United States": dailyLeaderboard },
-      weeklySales: { "United States": weeklyLeaderboard },
+      thisWeekEvents: {
+        "United Kingdom": ukEvents,
+        "Ireland": ieEvents,
+        "All": thisWeekShaped,
+      },
+      nextWeekEvents: {
+        "United Kingdom": nextUkEvents,
+        "Ireland": nextIeEvents,
+        "All": nextWeekShaped,
+      },
+      dailySales: { "All": dailyLeaderboard },
+      weeklySales: { "All": weeklyLeaderboard },
       campaignBreakdown: [],
+      tmmTelesales: {
+        todayCount: tmmTodayCount,
+        weekCount: tmmWeekCount,
+        activeWeek,
+      },
     },
     availableWeeks: weekNums,
     currentWeek: currentWeek || weekNums[weekNums.length - 1] || "WK1",
@@ -525,9 +625,10 @@ function processData(masterRows, salesRows, selectedWeek, salesPreStripped = fal
   };
 }
 
-// ── Data Generators (Mock) ───────────────────────────────────────────
+// ── Data Generators (Mock — kept for reference) ──────────────────────
 function generateEvents(country, count, weekOffset = 0) {
   const venueList = VENUES[country];
+  if (!venueList) return [];
   const baseDate = new Date();
   baseDate.setDate(baseDate.getDate() + weekOffset * 7);
   const monday = new Date(baseDate);
@@ -554,6 +655,7 @@ function generateEvents(country, count, weekOffset = 0) {
 
 function generateSalespeople(country, period) {
   const names = SALES_NAMES[country];
+  if (!names) return [];
   return CAMPAIGNS.map(campaign => ({
     campaign,
     top3: shuffle(names).slice(0, 3).map((name, i) => ({
@@ -596,7 +698,8 @@ function generateLiveSale(events) {
 }
 
 function generateNotification(events, salesData) {
-  const currencySymbol = USE_MOCK_DATA ? "\u00a3" : "$";
+  const currencySymbol = "\u00a3";
+
   const templates = [
     () => {
       const liveEvts = events.flat().filter(e => e.status === "live");
@@ -642,11 +745,11 @@ function generateNotification(events, salesData) {
 
 // ── Notification Types ───────────────────────────────────────────────
 const NOTIFICATION_TYPES = {
-  milestone: { icon: "🎯", color: "#FBC500", label: "Milestone" },
-  highPerformer: { icon: "⭐", color: "#BE6CFF", label: "Achievement" },
-  eventAlert: { icon: "📡", color: "#FF00B1", label: "Event" },
-  warning: { icon: "⚠️", color: "#ef4444", label: "Alert" },
-  info: { icon: "ℹ️", color: "#3CB6BA", label: "Info" },
+  milestone: { icon: "\u{1F3AF}", color: "#FBC500", label: "Milestone" },
+  highPerformer: { icon: "\u2b50", color: "#BE6CFF", label: "Achievement" },
+  eventAlert: { icon: "\u{1F4E1}", color: "#FF00B1", label: "Event" },
+  warning: { icon: "\u26a0\ufe0f", color: "#ef4444", label: "Alert" },
+  info: { icon: "\u2139\ufe0f", color: "#3CB6BA", label: "Info" },
 };
 
 // ── Custom Hooks ─────────────────────────────────────────────────────
@@ -681,7 +784,7 @@ function useGoogleSheetsData() {
       if (isFirstFetch.current) setLoading(true);
 
       // Fetch master tracker and discover sales tabs in parallel
-      const [masterRes, salesTabs] = await Promise.all([
+      const [masterRes, { eventSalesTabs, tmmTabs }] = await Promise.all([
         fetch(MASTER_TRACKER_URL),
         discoverSalesTabGids(),
       ]);
@@ -689,14 +792,15 @@ function useGoogleSheetsData() {
       if (!masterRes.ok) throw new Error(`Master tracker: HTTP ${masterRes.status}`);
 
       // Fetch all sales tab CSVs in parallel
-      const [masterText, salesDataRows] = await Promise.all([
+      const [masterText, salesDataRows, tmmSalesRows] = await Promise.all([
         masterRes.text(),
-        fetchAllSalesTabs(salesTabs),
+        fetchAllSalesTabs(eventSalesTabs),
+        fetchAllSalesTabs(tmmTabs),
       ]);
 
       const masterRows = parseCSV(masterText);
 
-      const processed = processData(masterRows, salesDataRows, selectedWeek, true);
+      const processed = processDataUK(masterRows, salesDataRows, tmmSalesRows, selectedWeek);
 
       setData(processed.data);
       setAvailableWeeks(processed.availableWeeks);
@@ -730,7 +834,7 @@ function useLiveSales(thisWeekEvents) {
   eventsRef.current = thisWeekEvents;
 
   useEffect(() => {
-    if (!USE_MOCK_DATA) return; // Only generate fake sales in mock mode
+    if (!USE_MOCK_DATA) return;
     const interval = setInterval(() => {
       const allEvents = Object.values(eventsRef.current);
       const sale = generateLiveSale(allEvents);
@@ -797,6 +901,7 @@ function useWeatherData(venues) {
       setLoading(true);
       const results = {};
       const now = Date.now();
+
       const uniqueVenues = [...new Set(venues)];
 
       for (const venue of uniqueVenues) {
@@ -806,11 +911,8 @@ function useWeatherData(venues) {
           continue;
         }
 
-        const coords = ALL_VENUE_COORDINATES[venue];
-        if (!coords) {
-          // Try state fallback
-          continue;
-        }
+        const coords = VENUE_COORDINATES[venue];
+        if (!coords) continue;
 
         try {
           const response = await fetch(
@@ -893,7 +995,7 @@ const ProgressBar = ({ value, max, color = "#FF00B1" }) => {
 };
 
 const RankBadge = ({ rank }) => {
-  const icons = { 1: "🥇", 2: "🥈", 3: "🥉" };
+  const icons = { 1: "\u{1F947}", 2: "\u{1F948}", 3: "\u{1F949}" };
   return <span style={{ fontSize: 18 }}>{icons[rank]}</span>;
 };
 
@@ -931,9 +1033,8 @@ const Card = ({ children, style = {}, accentColor }) => (
   </div>
 );
 
-const LiveSaleTicker = ({ sales, isLive }) => {
+const LiveSaleTicker = ({ sales }) => {
   if (!sales.length) return null;
-  const currencySymbol = USE_MOCK_DATA ? "\u00a3" : "$";
   return (
     <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8, position: "relative" }}>
       {sales.slice(0, 8).map((sale, i) => (
@@ -942,50 +1043,18 @@ const LiveSaleTicker = ({ sales, isLive }) => {
           border: "1px solid #FF00B122", borderRadius: 10, animation: i === 0 ? "slideIn 0.4s ease" : "none",
           flexShrink: 0,
         }}>
-          {USE_MOCK_DATA ? (
-            <>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                <span style={{ color: "#FF00B1", fontSize: 15, fontWeight: 700, fontFamily: "'Montserrat', sans-serif" }}>{currencySymbol}{sale.amount.toFixed(2)}</span>
-                <span style={{ color: "#475569", fontSize: 10 }}>{sale.time}</span>
-              </div>
-              <div style={{ color: "#94a3b8", fontSize: 11, fontFamily: "'Montserrat', sans-serif" }}>{sale.product}</div>
-              <div style={{ color: "#475569", fontSize: 10, marginTop: 2 }}>{sale.venue}</div>
-            </>
-          ) : (
-            <>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                <span style={{ color: "#FF00B1", fontSize: 13, fontWeight: 700, fontFamily: "'Montserrat', sans-serif" }}>{sale.agentName || sale.product}</span>
-                <span style={{ color: "#475569", fontSize: 10 }}>{sale.time}</span>
-              </div>
-              <div style={{ color: "#94a3b8", fontSize: 11, fontFamily: "'Montserrat', sans-serif" }}>{sale.eventName}</div>
-            </>
-          )}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+            <span style={{ color: "#FF00B1", fontSize: 13, fontWeight: 700, fontFamily: "'Montserrat', sans-serif" }}>{sale.agentName || sale.product}</span>
+            <span style={{ color: "#475569", fontSize: 10 }}>{sale.time}</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ color: "#94a3b8", fontSize: 11, fontFamily: "'Montserrat', sans-serif" }}>{sale.eventName}</span>
+            {sale.country && (
+              <span style={{ fontSize: 12 }}>{FLAGS[sale.country] || ""}</span>
+            )}
+          </div>
         </div>
       ))}
-    </div>
-  );
-};
-
-const WeatherCell = ({ venue, weatherData, loading }) => {
-  if (!WEATHER_ENABLED) return null;
-
-  if (loading) {
-    return <span style={{ color: "#475569", fontSize: 11, display: "inline-block", width: 60, height: 16, background: "linear-gradient(90deg, #1a1a2e 25%, #252540 50%, #1a1a2e 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.5s infinite", borderRadius: 4 }} />;
-  }
-
-  const weather = weatherData[venue];
-  if (!weather || weather.error) {
-    return <span style={{ color: "#334155", fontSize: 11 }}>--</span>;
-  }
-
-  const iconUrl = `https://openweathermap.org/img/wn/${weather.icon}.png`;
-
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-      <img src={iconUrl} alt={weather.description} style={{ width: 24, height: 24 }} />
-      <span style={{ fontSize: 12, color: "#94a3b8", fontVariantNumeric: "tabular-nums" }}>
-        {weather.temp}°C
-      </span>
     </div>
   );
 };
@@ -996,7 +1065,7 @@ const NotificationBell = ({ unreadCount, onClick }) => (
     cursor: "pointer", fontSize: 20, color: "#94a3b8",
     padding: 4, transition: "transform 0.2s ease",
   }}>
-    {"🔔"}
+    {"\u{1F514}"}
     {unreadCount > 0 && (
       <span style={{
         position: "absolute", top: -4, right: -6,
@@ -1126,7 +1195,7 @@ const EventMap = ({ events, leafletLoaded, leafletError }) => {
       boxZoom: false,
       keyboard: false,
       attributionControl: false,
-    }).setView(MAP_REGIONS.US.center, MAP_REGIONS.US.zoom);
+    }).setView(MAP_REGIONS.UK.center, MAP_REGIONS.UK.zoom);
 
     L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
       attribution: "",
@@ -1147,7 +1216,6 @@ const EventMap = ({ events, leafletLoaded, leafletError }) => {
     const L = window.L;
     const map = mapInstanceRef.current;
 
-    // Clear old markers and rotation
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
     if (rotationRef.current) {
@@ -1155,36 +1223,24 @@ const EventMap = ({ events, leafletLoaded, leafletError }) => {
       rotationRef.current = null;
     }
 
-    const countryColors = {
-      "United Kingdom": "#3CB6BA",
-      "Ireland": "#3CB6BA",
-      "United States": "#FF00B1",
-    };
-
-    const currencySymbol = USE_MOCK_DATA ? "\u00a3" : "$";
-
-    // Track which regions have events
-    const regionHasEvents = { US: false, UK: false };
+    const regionHasEvents = { UK: false, IE: false };
 
     events.forEach(event => {
-      let coords = ALL_VENUE_COORDINATES[event.venue];
+      let coords = VENUE_COORDINATES[event.venue];
 
-      // Fallback: try state abbreviation
-      if (!coords && event.state) {
-        const abbrev = extractStateAbbrev(event.state);
-        if (abbrev) coords = STATE_COORDINATES[abbrev];
+      // Fallback: try region name
+      if (!coords && event.region) {
+        coords = REGION_COORDINATES[event.region];
       }
 
       if (!coords) return;
 
-      // Determine region from country field or coordinates
-      const country = event.country || "United States";
-      if (country === "United Kingdom" || country === "Ireland") {
-        regionHasEvents.UK = true;
-      } else if (coords.lat > 49 && coords.lng > -11 && coords.lng < 2) {
-        regionHasEvents.UK = true;
+      // Determine region
+      const country = event.country || "United Kingdom";
+      if (country === "Ireland") {
+        regionHasEvents.IE = true;
       } else {
-        regionHasEvents.US = true;
+        regionHasEvents.UK = true;
       }
 
       const statusColor = {
@@ -1193,10 +1249,12 @@ const EventMap = ({ events, leafletLoaded, leafletError }) => {
         completed: "#64748b",
       }[event.status] || "#64748b";
 
+      const currSym = getCurrencySymbol(country);
+
       const marker = L.circleMarker([coords.lat, coords.lng], {
         radius: event.status === "live" ? 10 : 7,
         fillColor: statusColor,
-        color: countryColors[country] || statusColor,
+        color: "#3CB6BA",
         weight: 2,
         opacity: 0.9,
         fillOpacity: 0.6,
@@ -1208,14 +1266,15 @@ const EventMap = ({ events, leafletLoaded, leafletError }) => {
       marker.bindPopup(
         `<div style="font-family:'Montserrat',sans-serif;min-width:180px">
           <div style="font-size:13px;font-weight:700;margin-bottom:6px;color:#f1f5f9">${event.name}</div>
-          <div style="font-size:11px;color:#94a3b8;margin-bottom:4px">\ud83d\udccd ${event.venue}</div>
+          <div style="font-size:11px;color:#94a3b8;margin-bottom:4px">\ud83d\udccd ${event.venue}${event.region ? `, ${event.region}` : ""}</div>
           <div style="font-size:11px;color:#94a3b8;margin-bottom:8px">\ud83d\udcc6 ${event.date}</div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
             <span style="font-size:11px">${statusDot} ${statusLabel}</span>
+            <span style="font-size:11px;color:#94a3b8">${FLAGS[country] || ""}</span>
           </div>
           <div style="display:flex;justify-content:space-between;border-top:1px solid #1e293b;padding-top:6px;margin-top:4px">
             <span style="font-size:12px;color:#3CB6BA;font-weight:600">${event.ticketsSold} sales</span>
-            <span style="font-size:12px;color:#FF00B1;font-weight:600">${currencySymbol}${event.revenue.toLocaleString()}</span>
+            <span style="font-size:12px;color:#FF00B1;font-weight:600">${currSym}${event.revenue.toLocaleString()}</span>
           </div>
         </div>`,
         { className: "croci-popup" }
@@ -1224,19 +1283,17 @@ const EventMap = ({ events, leafletLoaded, leafletError }) => {
       markersRef.current.push(marker);
     });
 
-    // Build list of active regions (only those with events)
+    // Build list of active regions
     const regions = [];
-    if (regionHasEvents.US) regions.push(MAP_REGIONS.US);
     if (regionHasEvents.UK) regions.push(MAP_REGIONS.UK);
+    if (regionHasEvents.IE) regions.push(MAP_REGIONS.IE);
     activeRegionsRef.current = regions;
     setCurrentRegionIndex(0);
 
-    // Set initial view to first active region
     if (regions.length > 0) {
       map.setView(regions[0].center, regions[0].zoom, { animate: false });
     }
 
-    // Start auto-rotation if multiple regions have events
     if (regions.length > 1) {
       rotationRef.current = setInterval(() => {
         setCurrentRegionIndex(prev => {
@@ -1254,7 +1311,7 @@ const EventMap = ({ events, leafletLoaded, leafletError }) => {
   if (leafletError) {
     return (
       <Card style={{ marginBottom: 28 }}>
-        <SectionHeader icon="🗺️" subtitle="Geographic overview of all event locations">Event Map</SectionHeader>
+        <SectionHeader icon="\ud83d\uddfa\ufe0f" subtitle="Geographic overview of UK & Ireland event locations">Event Map</SectionHeader>
         <p style={{ color: "#ef4444", fontSize: 13 }}>Map unavailable: {leafletError}</p>
       </Card>
     );
@@ -1263,7 +1320,7 @@ const EventMap = ({ events, leafletLoaded, leafletError }) => {
   if (!leafletLoaded) {
     return (
       <Card style={{ marginBottom: 28 }}>
-        <SectionHeader icon="🗺️" subtitle="Geographic overview of all event locations">Event Map</SectionHeader>
+        <SectionHeader icon="\ud83d\uddfa\ufe0f" subtitle="Geographic overview of UK & Ireland event locations">Event Map</SectionHeader>
         <div style={{
           width: "100%", height: 400, borderRadius: 10, overflow: "hidden",
           background: "linear-gradient(90deg, #0a0f1a 25%, #111827 50%, #0a0f1a 75%)",
@@ -1278,7 +1335,7 @@ const EventMap = ({ events, leafletLoaded, leafletError }) => {
 
   return (
     <Card style={{ marginBottom: 28 }}>
-      <SectionHeader icon="🗺️" subtitle="Geographic overview of all event locations">Event Map</SectionHeader>
+      <SectionHeader icon="\ud83d\uddfa\ufe0f" subtitle="Geographic overview of UK & Ireland event locations">Event Map</SectionHeader>
       <div style={{ display: "flex", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 11, color: "#64748b" }}>
           <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -1314,14 +1371,14 @@ const EventMap = ({ events, leafletLoaded, leafletError }) => {
             ))}
           </div>
         )}
-        {activeRegionsRef.current.length > 1 && (
+        {activeRegionsRef.current.length > 0 && (
           <div style={{
             position: "absolute", top: 12, right: 12, zIndex: 1000,
             background: "rgba(0,0,0,0.6)", borderRadius: 6, padding: "4px 10px",
             fontSize: 11, color: "#94a3b8", fontFamily: "'Montserrat', sans-serif",
             fontWeight: 600, letterSpacing: 0.5,
           }}>
-            {activeRegionsRef.current[currentRegionIndex]?.label || ""}
+            {activeRegionsRef.current[currentRegionIndex]?.label || "UK & Ireland"}
           </div>
         )}
       </div>
@@ -1342,12 +1399,12 @@ const CrociLogo = ({ height = 28, color = "#FF00B1" }) => (
   </svg>
 );
 
-// ── World Clocks Component ───────────────────────────────────────────
+// ── World Clocks Component (London / Dublin / New York) ──────────────
 function WorldClocks({ currentTime }) {
   const zones = [
-    { city: "Los Angeles", tz: "America/Los_Angeles", abbr: "PT" },
-    { city: "New York", tz: "America/New_York", abbr: "ET" },
     { city: "London", tz: "Europe/London", abbr: "GMT" },
+    { city: "Dublin", tz: "Europe/Dublin", abbr: "IST" },
+    { city: "New York", tz: "America/New_York", abbr: "ET" },
   ];
 
   return (
@@ -1377,7 +1434,6 @@ function WorldClocks({ currentTime }) {
           );
         }
 
-        // Hour markers
         const markers = [];
         for (let i = 0; i < 12; i++) {
           const angle = ((i * 30 - 90) * Math.PI) / 180;
@@ -1434,7 +1490,7 @@ function WorldClocks({ currentTime }) {
 // ── Password Gate Component ──────────────────────────────────────────
 function PasswordGate({ children }) {
   const [authenticated, setAuthenticated] = useState(() => {
-    return sessionStorage.getItem("croci_auth") === "true";
+    return sessionStorage.getItem("croci_auth_uk") === "true";
   });
   const [password, setPassword] = useState("");
   const [error, setError] = useState(false);
@@ -1445,7 +1501,7 @@ function PasswordGate({ children }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (password === SITE_PASSWORD) {
-      sessionStorage.setItem("croci_auth", "true");
+      sessionStorage.setItem("croci_auth_uk", "true");
       setAuthenticated(true);
     } else {
       setError(true);
@@ -1479,7 +1535,7 @@ function PasswordGate({ children }) {
           <CrociLogo height={44} color="#FF00B1" />
         </div>
         <p style={{ fontSize: 10, color: "#64748b", margin: "0 0 28px", letterSpacing: 2.5, textTransform: "uppercase", fontFamily: "'Montserrat', sans-serif", fontWeight: 700 }}>
-          Operations Portal
+          UK & Ireland Operations Portal
         </p>
         <form onSubmit={handleSubmit}>
           <input
@@ -1528,12 +1584,10 @@ function PasswordGate({ children }) {
 
 // ── Main Dashboard ───────────────────────────────────────────────────
 export default function CrociPortal() {
-  const [activeCountry, setActiveCountry] = useState("United States");
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [expandedCampaign, setExpandedCampaign] = useState(null);
   const [notifOpen, setNotifOpen] = useState(false);
 
-  // Data hooks — both always called (React rules), only one used
+  // Data hooks
   const mockResult = useStableData();
   const sheetsResult = useGoogleSheetsData();
 
@@ -1544,7 +1598,7 @@ export default function CrociPortal() {
     data: activeResult.data,
   };
 
-  const { thisWeekEvents = {}, nextWeekEvents = {}, dailySales = {}, weeklySales = {}, campaignBreakdown = [] } = data || {};
+  const { thisWeekEvents = {}, nextWeekEvents = {}, dailySales = {}, weeklySales = {}, tmmTelesales = {} } = data || {};
 
   const liveSales = useLiveSales(thisWeekEvents);
   const displaySales = USE_MOCK_DATA ? liveSales : (recentSales || []);
@@ -1562,7 +1616,7 @@ export default function CrociPortal() {
   const { weatherData, weatherLoading } = useWeatherData(allVenues);
 
   const allThisWeekEvents = useMemo(() =>
-    Object.values(thisWeekEvents).flat().sort((a, b) => a.rawDate - b.rawDate),
+    (thisWeekEvents["All"] || []).sort((a, b) => a.rawDate - b.rawDate),
     [thisWeekEvents]
   );
 
@@ -1571,32 +1625,21 @@ export default function CrociPortal() {
     return () => clearInterval(t);
   }, []);
 
-  const currencySymbol = USE_MOCK_DATA ? "\u00a3" : "$";
-  const totalRevToday = Object.values(thisWeekEvents).flat().reduce((s, e) => s + e.revenue, 0);
-  const totalSalesToday = Object.values(thisWeekEvents).flat().reduce((s, e) => s + e.ticketsSold, 0);
-  const liveCount = Object.values(thisWeekEvents).flat().filter(e => e.status === "live").length;
+  const allEvents = thisWeekEvents["All"] || [];
+  const totalUpfronts = allEvents.reduce((s, e) => s + e.revenue, 0);
+  const totalSales = allEvents.reduce((s, e) => s + e.ticketsSold, 0);
+  const liveCount = allEvents.filter(e => e.status === "live").length;
 
-  const thisWeekHeaders = USE_MOCK_DATA
-    ? (WEATHER_ENABLED
-      ? ["Event", "Venue", "Date", "Weather", "Status", "Sales", "Revenue", "Progress"]
-      : ["Event", "Venue", "Date", "Status", "Sales", "Revenue", "Progress"])
-    : ["Event", "Location", "State", "Dates", "Status", "Sales / Target", "Staff", "CPA"];
+  const thisWeekHeaders = ["Event", "Location", "Region", "Dates", "Status", "Sales / Target", "Staff", "CPA"];
 
-  const kpis = USE_MOCK_DATA
-    ? [
-        { label: "Live Events", value: liveCount, color: "#FF00B1", icon: "📡" },
-        { label: "Sales Today", value: totalSalesToday.toLocaleString(), color: "#3CB6BA", icon: "🛒" },
-        { label: "Revenue Today", value: `${currencySymbol}${totalRevToday.toLocaleString()}`, color: "#FBC500", icon: "💰" },
-        { label: "Active Countries", value: COUNTRIES.length, color: "#BE6CFF", icon: "🌍" },
-      ]
-    : [
-        { label: "Live Events", value: liveCount, color: "#FF00B1", icon: "📡" },
-        { label: "Total Sales", value: totalSalesToday.toLocaleString(), color: "#3CB6BA", icon: "🛒" },
-        { label: "Total Upfronts", value: `$${totalRevToday.toLocaleString()}`, color: "#FBC500", icon: "💰" },
-        { label: "Events This Week", value: (thisWeekEvents["United States"] || []).length, color: "#BE6CFF", icon: "📋" },
-      ];
+  const kpis = [
+    { label: "Live Events", value: liveCount, color: "#FF00B1", icon: "\ud83d\udce1" },
+    { label: "Total Sales", value: totalSales.toLocaleString(), color: "#3CB6BA", icon: "\ud83d\uded2" },
+    { label: "Total Upfronts", value: `\u00a3${totalUpfronts.toLocaleString()}`, color: "#FBC500", icon: "\ud83d\udcb0" },
+    { label: "Events This Week", value: allEvents.length, color: "#BE6CFF", icon: "\ud83d\udccb" },
+  ];
 
-  // Loading state for live data
+  // Loading state
   if (!USE_MOCK_DATA && sheetsLoading && !data) {
     return (
       <PasswordGate>
@@ -1610,7 +1653,7 @@ export default function CrociPortal() {
             <div style={{ margin: "0 auto 20px", filter: "drop-shadow(0 4px 20px rgba(255,0,177,0.3))" }}>
               <CrociLogo height={40} color="#FF00B1" />
             </div>
-            <p style={{ color: "#64748b", fontSize: 14 }}>Loading live data from Google Sheets...</p>
+            <p style={{ color: "#64748b", fontSize: 14 }}>Loading UK & Ireland live data...</p>
             <div style={{ width: 200, height: 4, background: "#1e293b", borderRadius: 2, margin: "16px auto", overflow: "hidden" }}>
               <div style={{ width: "40%", height: "100%", background: "#FF00B1", borderRadius: 2, animation: "shimmer 1.5s infinite" }} />
             </div>
@@ -1649,8 +1692,6 @@ export default function CrociPortal() {
         .leaflet-popup-close-button:hover { color: #e2e8f0 !important; }
         .leaflet-control-attribution { background: rgba(10,15,26,0.8) !important; color: #475569 !important; font-size: 9px !important; }
         .leaflet-control-attribution a { color: #64748b !important; }
-        .leaflet-control-zoom a { background: #0d1117 !important; color: #94a3b8 !important; border-color: #1e293b !important; }
-        .leaflet-control-zoom a:hover { background: #111827 !important; color: #e2e8f0 !important; }
       `}</style>
 
       {/* ── Header ─────────────────────────────────────── */}
@@ -1673,7 +1714,7 @@ export default function CrociPortal() {
           <CrociLogo height={32} color="#FF00B1" />
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <p style={{ fontSize: 10, color: "#94a3b8", margin: 0, letterSpacing: 2, textTransform: "uppercase", fontFamily: "'Montserrat', sans-serif", fontWeight: 700 }}>Operations Portal</p>
+              <p style={{ fontSize: 10, color: "#94a3b8", margin: 0, letterSpacing: 2, textTransform: "uppercase", fontFamily: "'Montserrat', sans-serif", fontWeight: 700 }}>UK & Ireland Operations Portal</p>
               <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#FF00B1", animation: "pulse 1.5s infinite" }} />
                 <span style={{ fontSize: 9, color: "#FF00B1", fontWeight: 800, letterSpacing: 1, textTransform: "uppercase" }}>LIVE</span>
@@ -1686,10 +1727,8 @@ export default function CrociPortal() {
         <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
           <WorldClocks currentTime={currentTime} />
 
-          {/* Divider */}
           <div style={{ width: 1, height: 48, background: "linear-gradient(180deg, transparent, #1e293b, transparent)" }} />
 
-          {/* Right: Status + Date */}
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <NotificationBell unreadCount={unreadCount} onClick={(e) => { e.stopPropagation(); setNotifOpen(prev => !prev); }} />
             {!USE_MOCK_DATA && lastUpdated && (
@@ -1745,6 +1784,23 @@ export default function CrociPortal() {
           ))}
         </div>
 
+        {/* ── TMM Telesales Card ────────────────────────── */}
+        {!USE_MOCK_DATA && tmmTelesales && (tmmTelesales.todayCount > 0 || tmmTelesales.weekCount > 0) && (
+          <Card accentColor="#BE6CFF" style={{ marginBottom: 28 }}>
+            <SectionHeader icon="\ud83d\udcde" subtitle="The Modern Milkman telesales activity (not linked to field events)">TMM Telesales</SectionHeader>
+            <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <span style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700 }}>Today</span>
+                <span style={{ fontSize: 32, fontWeight: 900, color: "#BE6CFF", fontFamily: "'Montserrat', sans-serif" }}>{tmmTelesales.todayCount}</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <span style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700 }}>{tmmTelesales.activeWeek || "This Week"}</span>
+                <span style={{ fontSize: 32, fontWeight: 900, color: "#BE6CFF", fontFamily: "'Montserrat', sans-serif" }}>{tmmTelesales.weekCount}</span>
+              </div>
+            </div>
+          </Card>
+        )}
+
         {/* ── Event Map ───────────────────────────────── */}
         <EventMap events={allThisWeekEvents} leafletLoaded={leafletLoaded} leafletError={leafletError} />
 
@@ -1753,22 +1809,20 @@ export default function CrociPortal() {
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#FF00B1", animation: "pulse 1.5s infinite" }} />
             <span style={{ fontSize: 13, fontWeight: 600, color: "#FF00B1", textTransform: "uppercase", letterSpacing: 1 }}>
-              {USE_MOCK_DATA ? "Live Sales Feed" : "Recent Sales Entries"}
+              Recent Sales Entries
             </span>
           </div>
-          <LiveSaleTicker sales={displaySales} isLive={!USE_MOCK_DATA} />
+          <LiveSaleTicker sales={displaySales} />
           {displaySales.length === 0 && <p style={{ color: "#475569", fontSize: 13, margin: 0 }}>Waiting for incoming sales...</p>}
         </Card>
 
-        {/* ══════════════════════════════════════════════════
-            SECTION 1: THIS WEEK'S EVENTS
-        ══════════════════════════════════════════════════ */}
+        {/* ═══════════ SECTION 1: THIS WEEK'S EVENTS ═══════════ */}
         <Card style={{ marginBottom: 28, animation: "scaleIn 0.4s ease" }}>
-          <SectionHeader icon="📅" subtitle="All live and scheduled events with real-time sales data">
-            {USE_MOCK_DATA ? "This Week's Events" : `Events \u2014 ${selectedWeek || "This Week"}`}
+          <SectionHeader icon="\ud83d\udcc5" subtitle="All live and scheduled events with real-time sales data">
+            {`Events \u2014 ${selectedWeek || "This Week"}`}
           </SectionHeader>
 
-          {/* Week Picker (live mode only) */}
+          {/* Week Picker */}
           {!USE_MOCK_DATA && availableWeeks && availableWeeks.length > 0 && (
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
               <label style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>Week:</label>
@@ -1792,13 +1846,6 @@ export default function CrociPortal() {
             </div>
           )}
 
-          {/* Country Tabs (mock mode only) */}
-          {USE_MOCK_DATA && (
-            <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-              {ACTIVE_COUNTRIES.map(c => <CountryTab key={c} country={c} active={activeCountry === c} onClick={() => setActiveCountry(c)} />)}
-            </div>
-          )}
-
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "0 4px" }}>
               <thead>
@@ -1809,40 +1856,19 @@ export default function CrociPortal() {
                 </tr>
               </thead>
               <tbody>
-                {USE_MOCK_DATA ? (
-                  thisWeekEvents[activeCountry]?.map((event, i) => (
+                {(thisWeekEvents["All"] || []).map((event, i) => {
+                  const currSym = getCurrencySymbol(event.country);
+                  return (
                     <tr key={event.id} style={{ animation: `fadeUp 0.3s ease ${i * 0.05}s both`, transition: "background 0.2s ease", cursor: "default" }}
                       onMouseEnter={(e) => e.currentTarget.style.background = "#0d1117"}
                       onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                     >
-                      <td style={{ padding: "12px 14px", fontSize: 13, fontWeight: 600, color: "#e2e8f0" }}>{event.name}</td>
-                      <td style={{ padding: "12px 14px", fontSize: 12, color: "#94a3b8" }}>{event.venue}</td>
-                      <td style={{ padding: "12px 14px", fontSize: 12, color: "#94a3b8" }}>{event.date}</td>
-                      {WEATHER_ENABLED && (
-                        <td style={{ padding: "12px 14px" }}>
-                          <WeatherCell venue={event.venue} weatherData={weatherData} loading={weatherLoading} />
-                        </td>
-                      )}
-                      <td style={{ padding: "12px 14px" }}><StatusBadge status={event.status} /></td>
-                      <td style={{ padding: "12px 14px", fontSize: 14, fontWeight: 700, color: "#3CB6BA", fontVariantNumeric: "tabular-nums" }}>{event.ticketsSold}</td>
-                      <td style={{ padding: "12px 14px", fontSize: 14, fontWeight: 700, color: "#FF00B1", fontVariantNumeric: "tabular-nums" }}>{currencySymbol}{event.revenue.toLocaleString()}</td>
-                      <td style={{ padding: "12px 14px", minWidth: 120 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <ProgressBar value={event.ticketsSold} max={event.target} />
-                          <span style={{ fontSize: 10, color: "#64748b", whiteSpace: "nowrap" }}>{event.target > 0 ? Math.round((event.ticketsSold / event.target) * 100) : 0}%</span>
-                        </div>
+                      <td style={{ padding: "12px 14px", fontSize: 13, fontWeight: 600, color: "#e2e8f0" }}>
+                        {event.name}
+                        {event.country === "Ireland" && <span style={{ marginLeft: 6, fontSize: 12 }}>{FLAGS["Ireland"]}</span>}
                       </td>
-                    </tr>
-                  ))
-                ) : (
-                  (thisWeekEvents["United States"] || []).map((event, i) => (
-                    <tr key={event.id} style={{ animation: `fadeUp 0.3s ease ${i * 0.05}s both`, transition: "background 0.2s ease", cursor: "default" }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = "#0d1117"}
-                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                    >
-                      <td style={{ padding: "12px 14px", fontSize: 13, fontWeight: 600, color: "#e2e8f0" }}>{event.name}</td>
                       <td style={{ padding: "12px 14px", fontSize: 12, color: "#94a3b8" }}>{event.location || event.venue}</td>
-                      <td style={{ padding: "12px 14px", fontSize: 12, color: "#94a3b8" }}>{event.state}</td>
+                      <td style={{ padding: "12px 14px", fontSize: 12, color: "#94a3b8" }}>{event.region}</td>
                       <td style={{ padding: "12px 14px", fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap" }}>{event.date}</td>
                       <td style={{ padding: "12px 14px" }}><StatusBadge status={event.status} /></td>
                       <td style={{ padding: "12px 14px" }}>
@@ -1859,283 +1885,116 @@ export default function CrociPortal() {
                       </td>
                       <td style={{ padding: "12px 14px" }}>
                         {event.cpa !== null
-                          ? <span style={{ fontSize: 13, fontWeight: 700, color: event.cpa <= 80 ? "#FF00B1" : event.cpa <= 150 ? "#FBC500" : "#ef4444", fontVariantNumeric: "tabular-nums" }}>${event.cpa.toFixed(2)}</span>
+                          ? <span style={{ fontSize: 13, fontWeight: 700, color: event.cpa <= 80 ? "#FF00B1" : event.cpa <= 150 ? "#FBC500" : "#ef4444", fontVariantNumeric: "tabular-nums" }}>{currSym}{event.cpa.toFixed(2)}</span>
                           : <span style={{ color: "#475569", fontSize: 12 }}>--</span>}
                       </td>
                     </tr>
-                  ))
-                )}
+                  );
+                })}
               </tbody>
             </table>
-            {!USE_MOCK_DATA && (thisWeekEvents["United States"] || []).length === 0 && (
+            {!USE_MOCK_DATA && (thisWeekEvents["All"] || []).length === 0 && (
               <p style={{ color: "#475569", fontSize: 13, textAlign: "center", padding: 20 }}>No events found for {selectedWeek}</p>
             )}
           </div>
         </Card>
 
-        {/* ══════════════════════════════════════════════════
-            SECTION 2: LEADERBOARD — TODAY
-        ══════════════════════════════════════════════════ */}
+        {/* ═══════════ SECTION 2: LEADERBOARD — TODAY ═══════════ */}
         <Card style={{ marginBottom: 28, animation: "scaleIn 0.4s ease 0.1s both" }}>
-          <SectionHeader icon="🏆" subtitle={USE_MOCK_DATA ? "Top performers by campaign \u2014 updated in real-time" : "Top performers by event \u2014 based on live sales entries"}>Today's Leaderboard</SectionHeader>
-          {USE_MOCK_DATA ? (
-            ACTIVE_COUNTRIES.map(country => (
-              <div key={country} style={{ marginBottom: 24 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 600, color: "#94a3b8", margin: "0 0 12px", display: "flex", alignItems: "center", gap: 8 }}>
-                  <span>{FLAGS[country]}</span> {country}
-                </h3>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
-                  {dailySales[country]?.map(camp => (
-                    <div key={camp.campaign} style={{ background: "#0a0f1a", border: "1px solid #1e293b", borderRadius: 10, padding: 14 }}>
-                      <p style={{ fontSize: 11, color: "#64748b", margin: "0 0 10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>{camp.campaign}</p>
-                      {camp.top3.map(person => (
-                        <div key={person.name} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid #111827" }}>
-                          <RankBadge rank={person.rank} />
-                          <div style={{ flex: 1 }}>
-                            <p style={{ fontSize: 12, fontWeight: 600, color: "#e2e8f0", margin: 0 }}>{person.name}</p>
-                            <p style={{ fontSize: 10, color: "#64748b", margin: 0 }}>{person.sales} sales · {person.conversionRate}% conv.</p>
-                          </div>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: "#FF00B1", fontVariantNumeric: "tabular-nums" }}>{currencySymbol}{person.revenue.toLocaleString()}</span>
+          <SectionHeader icon="\ud83c\udfc6" subtitle="Top performers by event \u2014 based on live sales entries">Today's Leaderboard</SectionHeader>
+          <div>
+            {(dailySales["All"] || []).length === 0 ? (
+              <p style={{ color: "#475569", fontSize: 13, textAlign: "center", padding: 20 }}>No sales recorded for today yet</p>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
+                {(dailySales["All"] || []).map(camp => (
+                  <div key={camp.campaign} style={{ background: "#0a0f1a", border: "1px solid #1e293b", borderRadius: 10, padding: 14 }}>
+                    <p style={{ fontSize: 11, color: "#64748b", margin: "0 0 10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>{camp.campaign}</p>
+                    {camp.top3.map(person => (
+                      <div key={person.name} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid #111827" }}>
+                        <RankBadge rank={person.rank} />
+                        <div style={{ flex: 1 }}>
+                          <p style={{ fontSize: 12, fontWeight: 600, color: "#e2e8f0", margin: 0 }}>{person.name}</p>
+                          <p style={{ fontSize: 10, color: "#64748b", margin: 0 }}>{person.sales} sales</p>
                         </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))
-          ) : (
-            <div>
-              {(dailySales["United States"] || []).length === 0 ? (
-                <p style={{ color: "#475569", fontSize: 13, textAlign: "center", padding: 20 }}>No sales recorded for today yet</p>
-              ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
-                  {(dailySales["United States"] || []).map(camp => (
-                    <div key={camp.campaign} style={{ background: "#0a0f1a", border: "1px solid #1e293b", borderRadius: 10, padding: 14 }}>
-                      <p style={{ fontSize: 11, color: "#64748b", margin: "0 0 10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>{camp.campaign}</p>
-                      {camp.top3.map(person => (
-                        <div key={person.name} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid #111827" }}>
-                          <RankBadge rank={person.rank} />
-                          <div style={{ flex: 1 }}>
-                            <p style={{ fontSize: 12, fontWeight: 600, color: "#e2e8f0", margin: 0 }}>{person.name}</p>
-                            <p style={{ fontSize: 10, color: "#64748b", margin: 0 }}>{person.sales} sales</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </Card>
-
-        {/* ══════════════════════════════════════════════════
-            SECTION 3: LEADERBOARD — THIS WEEK
-        ══════════════════════════════════════════════════ */}
-        <Card style={{ marginBottom: 28, animation: "scaleIn 0.4s ease 0.15s both" }}>
-          <SectionHeader icon="📊" subtitle={USE_MOCK_DATA ? "Cumulative weekly performance across all active campaigns" : `Cumulative performance for ${selectedWeek || "this week"}`}>
-            {USE_MOCK_DATA ? "This Week's Leaderboard" : `${selectedWeek || "Week"} Leaderboard`}
-          </SectionHeader>
-          {USE_MOCK_DATA ? (
-            ACTIVE_COUNTRIES.map(country => (
-              <div key={country} style={{ marginBottom: 24 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 600, color: "#94a3b8", margin: "0 0 12px", display: "flex", alignItems: "center", gap: 8 }}>
-                  <span>{FLAGS[country]}</span> {country}
-                </h3>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
-                  {weeklySales[country]?.map(camp => (
-                    <div key={camp.campaign} style={{ background: "#0a0f1a", border: "1px solid #1e293b", borderRadius: 10, padding: 14 }}>
-                      <p style={{ fontSize: 11, color: "#64748b", margin: "0 0 10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>{camp.campaign}</p>
-                      {camp.top3.map(person => (
-                        <div key={person.name} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid #111827" }}>
-                          <RankBadge rank={person.rank} />
-                          <div style={{ flex: 1 }}>
-                            <p style={{ fontSize: 12, fontWeight: 600, color: "#e2e8f0", margin: 0 }}>{person.name}</p>
-                            <p style={{ fontSize: 10, color: "#64748b", margin: 0 }}>{person.sales} sales · {person.conversionRate}% conv.</p>
-                          </div>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: "#FF00B1", fontVariantNumeric: "tabular-nums" }}>{currencySymbol}{person.revenue.toLocaleString()}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))
-          ) : (
-            <div>
-              {(weeklySales["United States"] || []).length === 0 ? (
-                <p style={{ color: "#475569", fontSize: 13, textAlign: "center", padding: 20 }}>No sales data for {selectedWeek} events yet</p>
-              ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
-                  {(weeklySales["United States"] || []).map(camp => (
-                    <div key={camp.campaign} style={{ background: "#0a0f1a", border: "1px solid #1e293b", borderRadius: 10, padding: 14 }}>
-                      <p style={{ fontSize: 11, color: "#64748b", margin: "0 0 10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>{camp.campaign}</p>
-                      {camp.top3.map(person => (
-                        <div key={person.name} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid #111827" }}>
-                          <RankBadge rank={person.rank} />
-                          <div style={{ flex: 1 }}>
-                            <p style={{ fontSize: 12, fontWeight: 600, color: "#e2e8f0", margin: 0 }}>{person.name}</p>
-                            <p style={{ fontSize: 10, color: "#64748b", margin: 0 }}>{person.sales} sales</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </Card>
-
-        {/* ══════════════════════════════════════════════════
-            SECTION 4: CAMPAIGN BREAKDOWN (mock mode only)
-        ══════════════════════════════════════════════════ */}
-        {USE_MOCK_DATA && (
-          <Card style={{ marginBottom: 28, animation: "scaleIn 0.4s ease 0.2s both" }}>
-            <SectionHeader icon="📦" subtitle="Detailed breakdown by feeding plan and box type for each campaign">Campaign Product Breakdown</SectionHeader>
-            {campaignBreakdown.map((camp, ci) => (
-              <div key={camp.campaign} style={{ marginBottom: 16 }}>
-                <button
-                  onClick={() => setExpandedCampaign(expandedCampaign === ci ? null : ci)}
-                  style={{
-                    width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
-                    padding: "14px 18px", background: "#0a0f1a", border: "1px solid #1e293b", borderRadius: 10,
-                    cursor: "pointer", color: "#e2e8f0", fontFamily: "'Montserrat', sans-serif",
-                    transition: "background 0.2s ease, border-color 0.2s ease",
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "#0d1117"; e.currentTarget.style.borderColor = "#2d3748"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "#0a0f1a"; e.currentTarget.style.borderColor = "#1e293b"; }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <span style={{ fontSize: 16, fontWeight: 700 }}>{camp.campaign}</span>
-                    <span style={{ fontSize: 12, color: "#64748b", background: "#111827", padding: "2px 10px", borderRadius: 12 }}>
-                      {camp.products.length} products
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-                    <span style={{ fontSize: 13, color: "#FF00B1", fontWeight: 600 }}>{currencySymbol}{camp.totalRevenue.toLocaleString()}</span>
-                    <span style={{ fontSize: 13, color: "#3CB6BA" }}>{camp.totalUnits.toLocaleString()} units</span>
-                    <span style={{ fontSize: 18, color: "#64748b", transition: "transform 0.2s", transform: expandedCampaign === ci ? "rotate(180deg)" : "rotate(0)" }}>▾</span>
-                  </div>
-                </button>
-                {expandedCampaign === ci && (
-                  <div style={{ animation: "fadeUp 0.3s ease", marginTop: 4 }}>
-                    {["Feeding Plan", "Box Type"].map(type => (
-                      <div key={type} style={{ marginTop: 8 }}>
-                        <p style={{ fontSize: 11, color: "#64748b", padding: "8px 18px", margin: 0, textTransform: "uppercase", letterSpacing: 1, fontWeight: 600 }}>{type}s</p>
-                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                          <thead>
-                            <tr>
-                              {["Product", "Units Sold", "Revenue", "Avg Order Value", "Return Rate"].map(h => (
-                                <th key={h} style={{ padding: "6px 18px", textAlign: "left", fontSize: 10, color: "#475569", textTransform: "uppercase", letterSpacing: 1, fontWeight: 600 }}>{h}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {camp.products.filter(p => p.type === type).map((product, pi) => (
-                              <tr key={product.name} style={{
-                                borderBottom: "1px solid #111827",
-                                background: pi % 2 === 0 ? "transparent" : "#0a0f1a08",
-                                transition: "background 0.2s ease",
-                              }}
-                                onMouseEnter={(e) => e.currentTarget.style.background = "#0d1117"}
-                                onMouseLeave={(e) => e.currentTarget.style.background = pi % 2 === 0 ? "transparent" : "#0a0f1a08"}
-                              >
-                                <td style={{ padding: "10px 18px", fontSize: 13, fontWeight: 500, color: "#e2e8f0" }}>{product.name}</td>
-                                <td style={{ padding: "10px 18px", fontSize: 13, fontWeight: 600, color: "#3CB6BA", fontVariantNumeric: "tabular-nums" }}>{product.unitsSold}</td>
-                                <td style={{ padding: "10px 18px", fontSize: 13, fontWeight: 600, color: "#FF00B1", fontVariantNumeric: "tabular-nums" }}>{currencySymbol}{product.revenue.toLocaleString()}</td>
-                                <td style={{ padding: "10px 18px", fontSize: 13, color: "#94a3b8", fontVariantNumeric: "tabular-nums" }}>{currencySymbol}{product.avgOrderValue}</td>
-                                <td style={{ padding: "10px 18px" }}>
-                                  <span style={{ fontSize: 12, fontWeight: 600, color: product.returnRate > 4 ? "#ef4444" : product.returnRate > 2 ? "#FBC500" : "#FF00B1" }}>
-                                    {product.returnRate}%
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
                       </div>
                     ))}
                   </div>
-                )}
+                ))}
               </div>
-            ))}
-          </Card>
-        )}
+            )}
+          </div>
+        </Card>
 
-        {/* ══════════════════════════════════════════════════
-            SECTION 5: NEXT WEEK'S EVENTS
-        ══════════════════════════════════════════════════ */}
-        <Card style={{ marginBottom: 40, animation: "scaleIn 0.4s ease 0.25s both" }}>
-          <SectionHeader icon="🔮" subtitle={USE_MOCK_DATA ? "Upcoming events scheduled for next week across all territories" : `Events scheduled for next week`}>
-            {USE_MOCK_DATA ? "Next Week's Events" : `Next Week (WK${(parseInt((selectedWeek || "WK0").replace(/\D/g, ""), 10) || 0) + 1})`}
+        {/* ═══════════ SECTION 3: LEADERBOARD — THIS WEEK ═══════════ */}
+        <Card style={{ marginBottom: 28, animation: "scaleIn 0.4s ease 0.15s both" }}>
+          <SectionHeader icon="\ud83d\udcca" subtitle={`Cumulative performance for ${selectedWeek || "this week"}`}>
+            {`${selectedWeek || "Week"} Leaderboard`}
           </SectionHeader>
-          {USE_MOCK_DATA ? (
-            ACTIVE_COUNTRIES.map(country => (
-              <div key={country} style={{ marginBottom: 20 }}>
-                <h3 style={{ fontSize: 14, fontWeight: 600, color: "#94a3b8", margin: "0 0 10px", display: "flex", alignItems: "center", gap: 8 }}>
-                  <span>{FLAGS[country]}</span> {country}
-                </h3>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
-                  {nextWeekEvents[country]?.map(event => (
-                    <div key={event.id} style={{
-                      background: "#0a0f1a", border: "1px solid #1e293b", borderRadius: 10, padding: 14,
-                      display: "flex", flexDirection: "column", gap: 6,
-                      transition: "border-color 0.2s ease, transform 0.2s ease",
-                    }}
-                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#2d3748"; e.currentTarget.style.transform = "translateY(-1px)"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#1e293b"; e.currentTarget.style.transform = "translateY(0)"; }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                        <p style={{ fontSize: 13, fontWeight: 600, color: "#e2e8f0", margin: 0 }}>{event.name}</p>
-                        <StatusBadge status="upcoming" />
+          <div>
+            {(weeklySales["All"] || []).length === 0 ? (
+              <p style={{ color: "#475569", fontSize: 13, textAlign: "center", padding: 20 }}>No sales data for {selectedWeek} events yet</p>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
+                {(weeklySales["All"] || []).map(camp => (
+                  <div key={camp.campaign} style={{ background: "#0a0f1a", border: "1px solid #1e293b", borderRadius: 10, padding: 14 }}>
+                    <p style={{ fontSize: 11, color: "#64748b", margin: "0 0 10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>{camp.campaign}</p>
+                    {camp.top3.map(person => (
+                      <div key={person.name} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid #111827" }}>
+                        <RankBadge rank={person.rank} />
+                        <div style={{ flex: 1 }}>
+                          <p style={{ fontSize: 12, fontWeight: 600, color: "#e2e8f0", margin: 0 }}>{person.name}</p>
+                          <p style={{ fontSize: 10, color: "#64748b", margin: 0 }}>{person.sales} sales</p>
+                        </div>
                       </div>
-                      <p style={{ fontSize: 11, color: "#64748b", margin: 0 }}>📍 {event.venue}</p>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontSize: 12, color: "#94a3b8" }}>📆 {event.date}</span>
-                        <span style={{ fontSize: 11, color: "#475569" }}>Target: {event.target} sales</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
-              {(nextWeekEvents["United States"] || []).length === 0 ? (
-                <p style={{ color: "#475569", fontSize: 13, padding: 10 }}>No events scheduled for next week yet</p>
-              ) : (
-                (nextWeekEvents["United States"] || []).map(event => (
-                  <div key={event.id} style={{
-                    background: "#0a0f1a", border: "1px solid #1e293b", borderRadius: 10, padding: 14,
-                    display: "flex", flexDirection: "column", gap: 6,
-                    transition: "border-color 0.2s ease, transform 0.2s ease",
-                  }}
-                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#2d3748"; e.currentTarget.style.transform = "translateY(-1px)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#1e293b"; e.currentTarget.style.transform = "translateY(0)"; }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                      <p style={{ fontSize: 13, fontWeight: 600, color: "#e2e8f0", margin: 0 }}>{event.name}</p>
-                      <StatusBadge status="upcoming" />
-                    </div>
-                    <p style={{ fontSize: 11, color: "#64748b", margin: 0 }}>📍 {event.location || event.venue}{event.state ? `, ${event.state}` : ""}</p>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: 12, color: "#94a3b8" }}>📆 {event.date}</span>
-                      <span style={{ fontSize: 11, color: "#475569" }}>Target: {event.target || "?"} sales</span>
-                    </div>
+                    ))}
                   </div>
-                ))
-              )}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* ═══════════ SECTION 4: NEXT WEEK'S EVENTS ═══════════ */}
+        <Card style={{ marginBottom: 40, animation: "scaleIn 0.4s ease 0.25s both" }}>
+          <SectionHeader icon="\ud83d\udd2e" subtitle="Events scheduled for next week">
+            {`Next Week (WK${(parseInt((selectedWeek || "WK0").replace(/\D/g, ""), 10) || 0) + 1})`}
+          </SectionHeader>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
+            {(nextWeekEvents["All"] || []).length === 0 ? (
+              <p style={{ color: "#475569", fontSize: 13, padding: 10 }}>No events scheduled for next week yet</p>
+            ) : (
+              (nextWeekEvents["All"] || []).map(event => (
+                <div key={event.id} style={{
+                  background: "#0a0f1a", border: "1px solid #1e293b", borderRadius: 10, padding: 14,
+                  display: "flex", flexDirection: "column", gap: 6,
+                  transition: "border-color 0.2s ease, transform 0.2s ease",
+                }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#2d3748"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#1e293b"; e.currentTarget.style.transform = "translateY(0)"; }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: "#e2e8f0", margin: 0 }}>
+                      {event.name}
+                      {event.country === "Ireland" && <span style={{ marginLeft: 6, fontSize: 12 }}>{FLAGS["Ireland"]}</span>}
+                    </p>
+                    <StatusBadge status="upcoming" />
+                  </div>
+                  <p style={{ fontSize: 11, color: "#64748b", margin: 0 }}>{"\ud83d\udccd"} {event.location || event.venue}{event.region ? `, ${event.region}` : ""}</p>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 12, color: "#94a3b8" }}>{"\ud83d\udcc6"} {event.date}</span>
+                    <span style={{ fontSize: 11, color: "#475569" }}>Target: {event.target || "?"} sales</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </Card>
 
         {/* ── Footer ───────────────────────────────────── */}
         <div style={{ textAlign: "center", padding: "20px 0 40px", borderTop: "1px solid #111827" }}>
           <p style={{ fontSize: 11, color: "#334155", margin: 0, fontWeight: 600, fontFamily: "'Montserrat', sans-serif" }}>
-            Croci Operations Portal {USE_MOCK_DATA
-              ? "\u00b7 Prototype Dashboard \u00b7 Data is simulated for demonstration"
-              : `\u00b7 Live data from Google Sheets${lastUpdated ? ` \u00b7 Last refreshed ${timeAgo(lastUpdated)}` : ""}`}
+            Croci UK & Ireland Operations Portal {`\u00b7 Live data from Google Sheets${lastUpdated ? ` \u00b7 Last refreshed ${timeAgo(lastUpdated)}` : ""}`}
           </p>
         </div>
       </div>
