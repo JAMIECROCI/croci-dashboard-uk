@@ -447,8 +447,6 @@ function processDataUK(masterRows, salesDataRows, tmmSalesRows, selectedWeek) {
       const row = item.row;
       const cm = item.colMap || { date: 0, agent: 1, notListed: 2, location: 3, accountType: 4 };
       const accountType = (cm.accountType >= 0 ? (row[cm.accountType] || "") : "").trim().toLowerCase();
-      // Filter out reactivation entries
-      if (accountType.includes("reactivation")) return null;
       const location = cm.location >= 0 ? (row[cm.location] || "").trim() : "";
       return {
         date: parseUKSalesDate((row[cm.date] || "").trim()),
