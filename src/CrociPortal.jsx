@@ -108,7 +108,7 @@ const REGION_COORDINATES = {
 // ── Active Countries ─────────────────────────────────────────────────
 const COUNTRIES = ["United Kingdom", "Ireland"];
 const ACTIVE_COUNTRIES = COUNTRIES;
-const FLAGS = { "United Kingdom": "\u{1F1EC}\u{1F1E7}", "Ireland": "\u{1F1EE}\u{1F1EA}" };
+const FLAGS = { "United Kingdom": "🇬🇧", "Ireland": "🇮🇪" };
 
 // ── Currency Helper ──────────────────────────────────────────────────
 function getCurrencySymbol(country) {
@@ -268,14 +268,15 @@ async function discoverSalesTabGids() {
     if (!response.ok) throw new Error(`pubhtml HTTP ${response.status}`);
     const html = await response.text();
 
-    const tabPattern = /id="sheet-button-(\d+)"[\s\S]*?<a[^>]*>([^<]+)<\/a>/gi;
+    // UK pubhtml uses JS items.push({name: "...", gid: "..."}) format
+    const tabPattern = /name:\s*"([^"]+)"[^}]*gid:\s*"(\d+)"/gi;
     const eventSalesTabs = [];
     const tmmTabs = [];
     let match;
 
     while ((match = tabPattern.exec(html)) !== null) {
-      const gid = match[1];
-      const name = match[2].trim();
+      const name = match[1].trim();
+      const gid = match[2];
 
       // Extract week number from tab name like "WK 06 - HF/GC UK"
       const weekMatch = name.match(/WK\s*(\d+)/i);
@@ -314,8 +315,8 @@ async function fetchAllSalesTabs(tabs) {
       }
       const text = await res.text();
       const rows = parseCSV(text);
-      // Skip 2 header rows per tab, attach metadata
-      return rows.slice(2).map(row => ({
+      // Skip 3 header rows per tab (day headers, totals summary, column headers)
+      return rows.slice(3).map(row => ({
         row,
         tabName: tab.name,
         campaign: tab.campaign,
@@ -745,9 +746,9 @@ function generateNotification(events, salesData) {
 
 // ── Notification Types ───────────────────────────────────────────────
 const NOTIFICATION_TYPES = {
-  milestone: { icon: "\u{1F3AF}", color: "#FBC500", label: "Milestone" },
+  milestone: { icon: "🎯", color: "#FBC500", label: "Milestone" },
   highPerformer: { icon: "\u2b50", color: "#BE6CFF", label: "Achievement" },
-  eventAlert: { icon: "\u{1F4E1}", color: "#FF00B1", label: "Event" },
+  eventAlert: { icon: "📡", color: "#FF00B1", label: "Event" },
   warning: { icon: "\u26a0\ufe0f", color: "#ef4444", label: "Alert" },
   info: { icon: "\u2139\ufe0f", color: "#3CB6BA", label: "Info" },
 };
@@ -995,7 +996,7 @@ const ProgressBar = ({ value, max, color = "#FF00B1" }) => {
 };
 
 const RankBadge = ({ rank }) => {
-  const icons = { 1: "\u{1F947}", 2: "\u{1F948}", 3: "\u{1F949}" };
+  const icons = { 1: "🥇", 2: "🥈", 3: "🥉" };
   return <span style={{ fontSize: 18 }}>{icons[rank]}</span>;
 };
 
@@ -1065,7 +1066,7 @@ const NotificationBell = ({ unreadCount, onClick }) => (
     cursor: "pointer", fontSize: 20, color: "#94a3b8",
     padding: 4, transition: "transform 0.2s ease",
   }}>
-    {"\u{1F514}"}
+    {"🔔"}
     {unreadCount > 0 && (
       <span style={{
         position: "absolute", top: -4, right: -6,
@@ -1266,8 +1267,8 @@ const EventMap = ({ events, leafletLoaded, leafletError }) => {
       marker.bindPopup(
         `<div style="font-family:'Montserrat',sans-serif;min-width:180px">
           <div style="font-size:13px;font-weight:700;margin-bottom:6px;color:#f1f5f9">${event.name}</div>
-          <div style="font-size:11px;color:#94a3b8;margin-bottom:4px">\ud83d\udccd ${event.venue}${event.region ? `, ${event.region}` : ""}</div>
-          <div style="font-size:11px;color:#94a3b8;margin-bottom:8px">\ud83d\udcc6 ${event.date}</div>
+          <div style="font-size:11px;color:#94a3b8;margin-bottom:4px">📍 ${event.venue}${event.region ? `, ${event.region}` : ""}</div>
+          <div style="font-size:11px;color:#94a3b8;margin-bottom:8px">📆 ${event.date}</div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
             <span style="font-size:11px">${statusDot} ${statusLabel}</span>
             <span style="font-size:11px;color:#94a3b8">${FLAGS[country] || ""}</span>
@@ -1311,7 +1312,7 @@ const EventMap = ({ events, leafletLoaded, leafletError }) => {
   if (leafletError) {
     return (
       <Card style={{ marginBottom: 28 }}>
-        <SectionHeader icon="\ud83d\uddfa\ufe0f" subtitle="Geographic overview of UK & Ireland event locations">Event Map</SectionHeader>
+        <SectionHeader icon="🗺️" subtitle="Geographic overview of UK & Ireland event locations">Event Map</SectionHeader>
         <p style={{ color: "#ef4444", fontSize: 13 }}>Map unavailable: {leafletError}</p>
       </Card>
     );
@@ -1320,7 +1321,7 @@ const EventMap = ({ events, leafletLoaded, leafletError }) => {
   if (!leafletLoaded) {
     return (
       <Card style={{ marginBottom: 28 }}>
-        <SectionHeader icon="\ud83d\uddfa\ufe0f" subtitle="Geographic overview of UK & Ireland event locations">Event Map</SectionHeader>
+        <SectionHeader icon="🗺️" subtitle="Geographic overview of UK & Ireland event locations">Event Map</SectionHeader>
         <div style={{
           width: "100%", height: 400, borderRadius: 10, overflow: "hidden",
           background: "linear-gradient(90deg, #0a0f1a 25%, #111827 50%, #0a0f1a 75%)",
@@ -1335,7 +1336,7 @@ const EventMap = ({ events, leafletLoaded, leafletError }) => {
 
   return (
     <Card style={{ marginBottom: 28 }}>
-      <SectionHeader icon="\ud83d\uddfa\ufe0f" subtitle="Geographic overview of UK & Ireland event locations">Event Map</SectionHeader>
+      <SectionHeader icon="🗺️" subtitle="Geographic overview of UK & Ireland event locations">Event Map</SectionHeader>
       <div style={{ display: "flex", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 11, color: "#64748b" }}>
           <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -1633,10 +1634,10 @@ export default function CrociPortal() {
   const thisWeekHeaders = ["Event", "Location", "Region", "Dates", "Status", "Sales / Target", "Staff", "CPA"];
 
   const kpis = [
-    { label: "Live Events", value: liveCount, color: "#FF00B1", icon: "\ud83d\udce1" },
-    { label: "Total Sales", value: totalSales.toLocaleString(), color: "#3CB6BA", icon: "\ud83d\uded2" },
-    { label: "Total Upfronts", value: `\u00a3${totalUpfronts.toLocaleString()}`, color: "#FBC500", icon: "\ud83d\udcb0" },
-    { label: "Events This Week", value: allEvents.length, color: "#BE6CFF", icon: "\ud83d\udccb" },
+    { label: "Live Events", value: liveCount, color: "#FF00B1", icon: "📡" },
+    { label: "Total Sales", value: totalSales.toLocaleString(), color: "#3CB6BA", icon: "🛒" },
+    { label: "Total Upfronts", value: `£${totalUpfronts.toLocaleString()}`, color: "#FBC500", icon: "💰" },
+    { label: "Events This Week", value: allEvents.length, color: "#BE6CFF", icon: "📋" },
   ];
 
   // Loading state
@@ -1787,7 +1788,7 @@ export default function CrociPortal() {
         {/* ── TMM Telesales Card ────────────────────────── */}
         {!USE_MOCK_DATA && tmmTelesales && (tmmTelesales.todayCount > 0 || tmmTelesales.weekCount > 0) && (
           <Card accentColor="#BE6CFF" style={{ marginBottom: 28 }}>
-            <SectionHeader icon="\ud83d\udcde" subtitle="The Modern Milkman telesales activity (not linked to field events)">TMM Telesales</SectionHeader>
+            <SectionHeader icon="📞" subtitle="The Modern Milkman telesales activity (not linked to field events)">TMM Telesales</SectionHeader>
             <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 <span style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700 }}>Today</span>
@@ -1818,7 +1819,7 @@ export default function CrociPortal() {
 
         {/* ═══════════ SECTION 1: THIS WEEK'S EVENTS ═══════════ */}
         <Card style={{ marginBottom: 28, animation: "scaleIn 0.4s ease" }}>
-          <SectionHeader icon="\ud83d\udcc5" subtitle="All live and scheduled events with real-time sales data">
+          <SectionHeader icon="📅" subtitle="All live and scheduled events with real-time sales data">
             {`Events \u2014 ${selectedWeek || "This Week"}`}
           </SectionHeader>
 
@@ -1901,7 +1902,7 @@ export default function CrociPortal() {
 
         {/* ═══════════ SECTION 2: LEADERBOARD — TODAY ═══════════ */}
         <Card style={{ marginBottom: 28, animation: "scaleIn 0.4s ease 0.1s both" }}>
-          <SectionHeader icon="\ud83c\udfc6" subtitle="Top performers by event \u2014 based on live sales entries">Today's Leaderboard</SectionHeader>
+          <SectionHeader icon="🏆" subtitle="Top performers by event — based on live sales entries">Today's Leaderboard</SectionHeader>
           <div>
             {(dailySales["All"] || []).length === 0 ? (
               <p style={{ color: "#475569", fontSize: 13, textAlign: "center", padding: 20 }}>No sales recorded for today yet</p>
@@ -1928,7 +1929,7 @@ export default function CrociPortal() {
 
         {/* ═══════════ SECTION 3: LEADERBOARD — THIS WEEK ═══════════ */}
         <Card style={{ marginBottom: 28, animation: "scaleIn 0.4s ease 0.15s both" }}>
-          <SectionHeader icon="\ud83d\udcca" subtitle={`Cumulative performance for ${selectedWeek || "this week"}`}>
+          <SectionHeader icon="📊" subtitle={`Cumulative performance for ${selectedWeek || "this week"}`}>
             {`${selectedWeek || "Week"} Leaderboard`}
           </SectionHeader>
           <div>
@@ -1957,7 +1958,7 @@ export default function CrociPortal() {
 
         {/* ═══════════ SECTION 4: NEXT WEEK'S EVENTS ═══════════ */}
         <Card style={{ marginBottom: 40, animation: "scaleIn 0.4s ease 0.25s both" }}>
-          <SectionHeader icon="\ud83d\udd2e" subtitle="Events scheduled for next week">
+          <SectionHeader icon="🔮" subtitle="Events scheduled for next week">
             {`Next Week (WK${(parseInt((selectedWeek || "WK0").replace(/\D/g, ""), 10) || 0) + 1})`}
           </SectionHeader>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
@@ -1980,9 +1981,9 @@ export default function CrociPortal() {
                     </p>
                     <StatusBadge status="upcoming" />
                   </div>
-                  <p style={{ fontSize: 11, color: "#64748b", margin: 0 }}>{"\ud83d\udccd"} {event.location || event.venue}{event.region ? `, ${event.region}` : ""}</p>
+                  <p style={{ fontSize: 11, color: "#64748b", margin: 0 }}>{"📍"} {event.location || event.venue}{event.region ? `, ${event.region}` : ""}</p>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: 12, color: "#94a3b8" }}>{"\ud83d\udcc6"} {event.date}</span>
+                    <span style={{ fontSize: 12, color: "#94a3b8" }}>{"📆"} {event.date}</span>
                     <span style={{ fontSize: 11, color: "#475569" }}>Target: {event.target || "?"} sales</span>
                   </div>
                 </div>
