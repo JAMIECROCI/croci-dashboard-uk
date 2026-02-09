@@ -340,8 +340,34 @@ async function fetchSingleTab(tab, retries = 3) {
         continue;
       }
       const rows = parseCSV(text);
-      return rows.slice(3).map(row => ({
+
+      // Smart header detection: find the row starting with "Submission Date"
+      let headerIdx = -1;
+      for (let r = 0; r < Math.min(rows.length, 5); r++) {
+        if (rows[r] && rows[r][0] && rows[r][0].toLowerCase().startsWith("submission date")) {
+          headerIdx = r;
+          break;
+        }
+      }
+      if (headerIdx === -1) {
+        console.warn(`Sales tab ${tab.name}: no header row found, skipping`);
+        continue;
+      }
+
+      // Build column index map from the header row
+      const headers = rows[headerIdx].map(h => (h || "").trim().toLowerCase());
+      const colMap = {
+        date: 0, // Submission Date is always col 0
+        agent: headers.indexOf("agent name"),
+        notListed: headers.indexOf("*not listed"),
+        location: headers.indexOf("location"),
+        accountType: headers.indexOf("account type"),
+      };
+
+      const dataRows = rows.slice(headerIdx + 1);
+      return dataRows.map(row => ({
         row,
+        colMap,
         tabName: tab.name,
         campaign: tab.campaign,
         country: tab.country,
@@ -414,23 +440,32 @@ function processDataUK(masterRows, salesDataRows, tmmSalesRows, selectedWeek) {
       };
     });
 
-  // Parse UK Sales Entries
+  // Parse UK Sales Entries (unified across all tab types)
   const salesData = salesDataRows
     .filter(item => item && item.row && item.row.length >= 4)
     .map(item => {
       const row = item.row;
+      const cm = item.colMap || { date: 0, agent: 1, notListed: 2, location: 3, accountType: 4 };
+      const accountType = (cm.accountType >= 0 ? (row[cm.accountType] || "") : "").trim().toLowerCase();
+      // Filter out reactivation entries
+      if (accountType.includes("reactivation")) return null;
+      const location = cm.location >= 0 ? (row[cm.location] || "").trim() : "";
       return {
-        date: parseUKSalesDate(row[0]),
-        dateRaw: (row[0] || "").trim(),
-        agentName: extractUKAgent(row[1], row[2]),
-        location: (row[3] || "").trim(), // JOIN KEY: matches showName
+        date: parseUKSalesDate((row[cm.date] || "").trim()),
+        dateRaw: (row[cm.date] || "").trim(),
+        agentName: extractUKAgent(
+          cm.agent >= 0 ? row[cm.agent] : "",
+          cm.notListed >= 0 ? row[cm.notListed] : ""
+        ),
+        location, // JOIN KEY: matches showName
+        accountType,
         campaign: item.campaign,
         country: item.country,
         weekNum: item.weekNum,
         tabName: item.tabName,
       };
     })
-    .filter(s => s.date && s.location);
+    .filter(s => s && s.date && s.location);
 
   // Group sales by location (join key, case-insensitive)
   const salesByLocation = {};
@@ -567,22 +602,39 @@ function processDataUK(masterRows, salesDataRows, tmmSalesRows, selectedWeek) {
   const dailyLeaderboard = buildLeaderboard(todaySalesForLeaderboard);
   const weeklyLeaderboard = buildLeaderboard(weekSalesForLeaderboard);
 
-  // Process TMM Telesales separately
+  // Process TMM Telesales separately (no Location — just count by date)
   const tmmSales = tmmSalesRows
     .filter(item => item && item.row && item.row.length >= 2)
     .map(item => {
       const row = item.row;
+      const cm = item.colMap || { date: 0, agent: 1, notListed: 2, accountType: 3 };
+      const accountType = (cm.accountType >= 0 ? (row[cm.accountType] || "") : "").trim().toLowerCase();
       return {
-        date: parseUKSalesDate(row[0]),
-        dateRaw: (row[0] || "").trim(),
-        agentName: extractUKAgent(row[1], row[2]),
+        date: parseUKSalesDate((row[cm.date] || "").trim()),
+        dateRaw: (row[cm.date] || "").trim(),
+        agentName: extractUKAgent(
+          cm.agent >= 0 ? row[cm.agent] : "",
+          cm.notListed >= 0 ? row[cm.notListed] : ""
+        ),
+        accountType,
         weekNum: item.weekNum,
       };
     })
     .filter(s => s.date);
 
+  // TMM: filter by date range of active week events
+  const weekStart = thisWeekEvts.length > 0
+    ? thisWeekEvts.reduce((min, e) => (!min || (e.startDate && e.startDate < min) ? e.startDate : min), null)
+    : null;
+  const weekEnd = thisWeekEvts.length > 0
+    ? thisWeekEvts.reduce((max, e) => (!max || (e.endDate && e.endDate > max) ? e.endDate : max), null)
+    : null;
+  const tmmWeekSales = tmmSales.filter(s => {
+    if (!weekStart || !weekEnd) return s.weekNum === activeWeek;
+    return s.date >= weekStart && s.date <= weekEnd;
+  });
   const tmmTodayCount = tmmSales.filter(s => s.dateRaw && s.dateRaw.startsWith(todayStr)).length;
-  const tmmWeekCount = tmmSales.filter(s => s.weekNum === activeWeek).length;
+  const tmmWeekCount = tmmWeekSales.length;
 
   // Transform events to dashboard shape
   function toEventShape(event) {
