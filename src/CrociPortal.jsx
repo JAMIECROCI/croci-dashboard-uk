@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
 // ── Configuration ────────────────────────────────────────────────────
-const OPENWEATHER_API_KEY = "YOUR_API_KEY_HERE";
+const OPENWEATHER_API_KEY = "a5da49aa0ec94774a9b48ca9630165fc";
 const WEATHER_ENABLED = OPENWEATHER_API_KEY !== "YOUR_API_KEY_HERE";
 const WEATHER_CACHE_TTL = 30 * 60 * 1000;
 const USE_MOCK_DATA = false;
