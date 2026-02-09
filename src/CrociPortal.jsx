@@ -323,11 +323,11 @@ async function discoverSalesTabGids() {
   return { eventSalesTabs: [], tmmTabs: [] };
 }
 
-async function fetchSingleTab(tab, retries = 2) {
+async function fetchSingleTab(tab, retries = 3) {
   const url = `${SALES_CSV_BASE_URL}?gid=${tab.gid}&single=true&output=csv`;
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      if (attempt > 0) await new Promise(r => setTimeout(r, 800 * attempt));
+      if (attempt > 0) await new Promise(r => setTimeout(r, 1500 * attempt));
       const res = await fetch(url);
       if (!res.ok) {
         console.warn(`Sales tab ${tab.name}: HTTP ${res.status} (attempt ${attempt + 1})`);
@@ -356,16 +356,16 @@ async function fetchSingleTab(tab, retries = 2) {
 }
 
 async function fetchAllSalesTabs(tabs) {
-  // Batch requests (4 at a time) to avoid Google Sheets rate limiting
-  const BATCH_SIZE = 4;
+  // Batch requests (3 at a time) to avoid Google Sheets rate limiting
+  const BATCH_SIZE = 3;
   const allResults = [];
   for (let i = 0; i < tabs.length; i += BATCH_SIZE) {
     const batch = tabs.slice(i, i + BATCH_SIZE);
     const batchResults = await Promise.all(batch.map(tab => fetchSingleTab(tab)));
     allResults.push(...batchResults);
-    // Small delay between batches if more remain
+    // Delay between batches to respect rate limits
     if (i + BATCH_SIZE < tabs.length) {
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 500));
     }
   }
   return allResults.flat();
@@ -812,15 +812,17 @@ function useStableData() {
 }
 
 function useGoogleSheetsData() {
-  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [availableWeeks, setAvailableWeeks] = useState([]);
   const [selectedWeek, setSelectedWeek] = useState(null);
-  const [currentWeek, setCurrentWeek] = useState(null);
-  const [recentSales, setRecentSales] = useState([]);
+  const [rawFetchCount, setRawFetchCount] = useState(0);
   const isFirstFetch = useRef(true);
+
+  // Cache raw data in refs so week changes don't trigger re-fetches
+  const masterRowsRef = useRef(null);
+  const salesDataRef = useRef(null);
+  const tmmSalesRef = useRef(null);
 
   const fetchData = useCallback(async () => {
     if (USE_MOCK_DATA) return;
@@ -835,32 +837,27 @@ function useGoogleSheetsData() {
 
       if (!masterRes.ok) throw new Error(`Master tracker: HTTP ${masterRes.status}`);
 
-      // Fetch all sales tab CSVs in parallel
-      const [masterText, salesDataRows, tmmSalesRows] = await Promise.all([
-        masterRes.text(),
-        fetchAllSalesTabs(eventSalesTabs),
-        fetchAllSalesTabs(tmmTabs),
-      ]);
+      // Fetch sales tabs sequentially (max 3 concurrent per batch)
+      const masterText = await masterRes.text();
+      const salesDataRows = await fetchAllSalesTabs(eventSalesTabs);
+      const tmmSalesRows = await fetchAllSalesTabs(tmmTabs);
 
-      const masterRows = parseCSV(masterText);
+      // Store raw data in refs
+      masterRowsRef.current = parseCSV(masterText);
+      salesDataRef.current = salesDataRows;
+      tmmSalesRef.current = tmmSalesRows;
 
-      const processed = processDataUK(masterRows, salesDataRows, tmmSalesRows, selectedWeek);
-
-      setData(processed.data);
-      setAvailableWeeks(processed.availableWeeks);
-      setCurrentWeek(processed.currentWeek);
-      if (!selectedWeek) setSelectedWeek(processed.currentWeek);
-      setRecentSales(processed.recentSales);
       setLastUpdated(new Date());
       setError(null);
       isFirstFetch.current = false;
+      setRawFetchCount(c => c + 1);
     } catch (err) {
       setError(err.message);
       isFirstFetch.current = false;
     } finally {
       setLoading(false);
     }
-  }, [selectedWeek]);
+  }, []); // No selectedWeek dependency — fetch once, process many
 
   useEffect(() => {
     if (USE_MOCK_DATA) return;
@@ -869,7 +866,30 @@ function useGoogleSheetsData() {
     return () => clearInterval(interval);
   }, [fetchData]);
 
-  return { data, loading, error, lastUpdated, availableWeeks, selectedWeek, setSelectedWeek, currentWeek, recentSales };
+  // Process data whenever raw data or selectedWeek changes
+  const processed = useMemo(() => {
+    if (!masterRowsRef.current || !salesDataRef.current) return null;
+    return processDataUK(masterRowsRef.current, salesDataRef.current, tmmSalesRef.current || [], selectedWeek);
+  }, [selectedWeek, rawFetchCount]);
+
+  // Auto-set selectedWeek on first load
+  useEffect(() => {
+    if (processed && !selectedWeek) {
+      setSelectedWeek(processed.currentWeek);
+    }
+  }, [processed, selectedWeek]);
+
+  return {
+    data: processed?.data || null,
+    loading,
+    error,
+    lastUpdated,
+    availableWeeks: processed?.availableWeeks || [],
+    selectedWeek,
+    setSelectedWeek,
+    currentWeek: processed?.currentWeek || null,
+    recentSales: processed?.recentSales || [],
+  };
 }
 
 function useLiveSales(thisWeekEvents) {
