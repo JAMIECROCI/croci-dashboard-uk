@@ -1939,29 +1939,35 @@ export default function CrociPortal() {
             </div>
           )}
 
-          <div style={{ overflowX: "auto" }}>
+          <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "70vh" }}>
             <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "0 4px" }}>
-              <thead>
+              <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
                 <tr>
                   {thisWeekHeaders.map(h => (
-                    <th key={h} style={{ padding: "8px 14px", textAlign: "left", fontSize: 10, color: "#475569", textTransform: "uppercase", letterSpacing: 1.2, fontWeight: 600, borderBottom: "1px solid #1e293b" }}>{h}</th>
+                    <th key={h} style={{ padding: "8px 14px", textAlign: "left", fontSize: 10, color: "#475569", textTransform: "uppercase", letterSpacing: 1.2, fontWeight: 600, borderBottom: "1px solid #1e293b", background: "#0d1117" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {groupedThisWeekEvents.map(([groupName, groupEvents]) => (
+                {groupedThisWeekEvents.map(([groupName, groupEvents]) => {
+                  const campSales = groupEvents.reduce((s, e) => s + (e.ticketsSold || 0), 0);
+                  const campTarget = groupEvents.reduce((s, e) => s + (e.target || 0), 0);
+                  const campUpfronts = groupEvents.reduce((s, e) => s + (e.totalUpfronts || 0), 0);
+                  const campCPA = campSales > 0 ? campUpfronts / campSales : null;
+                  const campColor = CAMPAIGN_GROUP_COLORS[groupName] || "#64748b";
+                  return (
                   <React.Fragment key={`group-${groupName}`}>
                     <tr>
                       <td
-                        colSpan={thisWeekHeaders.length}
+                        colSpan={5}
                         style={{
                           padding: "12px 14px 6px",
                           fontSize: 11,
                           fontWeight: 800,
-                          color: CAMPAIGN_GROUP_COLORS[groupName] || "#64748b",
+                          color: campColor,
                           textTransform: "uppercase",
                           letterSpacing: 1.5,
-                          borderBottom: `2px solid ${(CAMPAIGN_GROUP_COLORS[groupName] || "#1e293b")}33`,
+                          borderBottom: `2px solid ${campColor}33`,
                           fontFamily: "'Montserrat', sans-serif",
                         }}
                       >
@@ -1969,6 +1975,28 @@ export default function CrociPortal() {
                         <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 500, color: "#475569" }}>
                           ({groupEvents.length} event{groupEvents.length !== 1 ? "s" : ""})
                         </span>
+                      </td>
+                      <td style={{
+                        padding: "12px 14px 6px",
+                        borderBottom: `2px solid ${campColor}33`,
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: campColor, fontVariantNumeric: "tabular-nums" }}>{campSales}</span>
+                          <span style={{ color: "#475569", fontSize: 12 }}>/ {campTarget || "?"}</span>
+                          <ProgressBar value={campSales} max={campTarget || 1} color={campTarget > 0 && campSales >= campTarget ? "#FF00B1" : campColor} />
+                        </div>
+                      </td>
+                      <td style={{
+                        padding: "12px 14px 6px",
+                        borderBottom: `2px solid ${campColor}33`,
+                      }} />
+                      <td style={{
+                        padding: "12px 14px 6px",
+                        borderBottom: `2px solid ${campColor}33`,
+                      }}>
+                        {campCPA !== null
+                          ? <span style={{ fontSize: 13, fontWeight: 700, color: campCPA <= 80 ? "#FF00B1" : campCPA <= 150 ? "#FBC500" : "#ef4444", fontVariantNumeric: "tabular-nums" }}>£{campCPA.toFixed(2)}</span>
+                          : <span style={{ color: "#475569", fontSize: 12 }}>--</span>}
                       </td>
                     </tr>
                     {groupEvents.map((event, i) => {
@@ -2023,7 +2051,8 @@ export default function CrociPortal() {
                       );
                     })}
                   </React.Fragment>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
             {!USE_MOCK_DATA && (thisWeekEvents["All"] || []).length === 0 && (
