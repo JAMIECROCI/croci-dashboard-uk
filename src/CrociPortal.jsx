@@ -257,6 +257,18 @@ function getCampaignGroup(client) {
   return "Other";
 }
 
+// Classify a sale row by its Account Type (Column D) value
+function classifySaleRow(accountType) {
+  const at = (accountType || "").trim().toLowerCase();
+  if (at === "reactivation" || at === "sunp")
+    return { campaign: "TMM Telesales", isTMM: true };
+  if (at === "tails.com activation")
+    return { campaign: "Tails.com", isTMM: false };
+  if (at.includes("hellofresh") || at.includes("green chef"))
+    return { campaign: "HF/GC", isTMM: false };
+  return { campaign: "Unknown", isTMM: false };
+}
+
 function getWeekMonday(date) {
   const d = new Date(date);
   const day = d.getDay();
@@ -280,7 +292,7 @@ function formatDateForUKSales(date) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-// ── Sales Tab Discovery (UK: campaign-based tabs) ────────────────────
+// ── Sales Tab Discovery (unified — all tabs as one pool) ─────────────
 async function discoverSalesTabGids() {
   try {
     const response = await fetch(SALES_PUBHTML_URL);
@@ -289,8 +301,7 @@ async function discoverSalesTabGids() {
 
     // UK pubhtml uses JS items.push({name: "...", gid: "..."}) format
     const tabPattern = /name:\s*"([^"]+)"[^}]*gid:\s*"(\d+)"/gi;
-    const eventSalesTabs = [];
-    const tmmTabs = [];
+    const allSalesTabs = [];
     let match;
 
     while ((match = tabPattern.exec(html)) !== null) {
@@ -302,28 +313,18 @@ async function discoverSalesTabGids() {
       if (!weekMatch) continue;
       const weekNum = `WK${parseInt(weekMatch[1], 10)}`;
 
-      // Categorize
-      if (/TMM|TELESALES/i.test(name)) {
-        tmmTabs.push({ gid, name, weekNum, campaign: "TMM Telesales", country: "United Kingdom" });
-      } else if (/HF\s*IE/i.test(name)) {
-        eventSalesTabs.push({ gid, name, weekNum, campaign: "HF IE", country: "Ireland" });
-      } else if (/HF[\s/]*GC\s*UK/i.test(name)) {
-        eventSalesTabs.push({ gid, name, weekNum, campaign: "HF/GC UK", country: "United Kingdom" });
-      } else if (/TAILS/i.test(name)) {
-        eventSalesTabs.push({ gid, name, weekNum, campaign: "Tails.com", country: "United Kingdom" });
-      }
+      // No campaign categorisation — classification happens per-row via Account Type
+      allSalesTabs.push({ gid, name, weekNum });
     }
 
-    if (eventSalesTabs.length > 0 || tmmTabs.length > 0) {
-      return { eventSalesTabs, tmmTabs };
-    }
+    if (allSalesTabs.length > 0) return allSalesTabs;
   } catch (err) {
     console.warn("Sales tab discovery failed:", err);
   }
-  return { eventSalesTabs: [], tmmTabs: [] };
+  return [];
 }
 
-async function fetchSingleTab(tab, retries = 3) {
+async function fetchSingleTab(tab, retries = 2) {
   const url = `${SALES_CSV_BASE_URL}?gid=${tab.gid}&single=true&output=csv`;
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
@@ -369,8 +370,6 @@ async function fetchSingleTab(tab, retries = 3) {
         row,
         colMap,
         tabName: tab.name,
-        campaign: tab.campaign,
-        country: tab.country,
         weekNum: tab.weekNum,
       }));
     } catch (err) {
@@ -398,7 +397,7 @@ async function fetchAllSalesTabs(tabs) {
 }
 
 // ── Process Google Sheets Data (UK) ──────────────────────────────────
-function processDataUK(masterRows, salesDataRows, tmmSalesRows, selectedWeek) {
+function processDataUK(masterRows, allSalesRows, selectedWeek) {
   // Parse UK Master Tracker — skip 1 header row
   const masterData = masterRows.slice(1);
 
@@ -440,13 +439,14 @@ function processDataUK(masterRows, salesDataRows, tmmSalesRows, selectedWeek) {
       };
     });
 
-  // Parse UK Sales Entries (unified across all tab types)
-  const salesData = salesDataRows
-    .filter(item => item && item.row && item.row.length >= 4)
+  // Parse ALL sales entries, classify each row by Account Type (Column D)
+  const allParsed = allSalesRows
+    .filter(item => item && item.row && item.row.length >= 2)
     .map(item => {
       const row = item.row;
       const cm = item.colMap || { date: 0, agent: 1, notListed: 2, location: 3, accountType: 4 };
-      const accountType = (cm.accountType >= 0 ? (row[cm.accountType] || "") : "").trim().toLowerCase();
+      const accountTypeRaw = (cm.accountType >= 0 ? (row[cm.accountType] || "") : "").trim();
+      const classification = classifySaleRow(accountTypeRaw);
       const location = cm.location >= 0 ? (row[cm.location] || "").trim() : "";
       return {
         date: parseUKSalesDate((row[cm.date] || "").trim()),
@@ -455,15 +455,19 @@ function processDataUK(masterRows, salesDataRows, tmmSalesRows, selectedWeek) {
           cm.agent >= 0 ? row[cm.agent] : "",
           cm.notListed >= 0 ? row[cm.notListed] : ""
         ),
-        location, // JOIN KEY: matches showName
-        accountType,
-        campaign: item.campaign,
-        country: item.country,
+        location,
+        accountType: accountTypeRaw.toLowerCase(),
+        campaign: classification.campaign,
+        isTMM: classification.isTMM,
         weekNum: item.weekNum,
         tabName: item.tabName,
       };
     })
-    .filter(s => s && s.date && s.location);
+    .filter(s => s && s.date);
+
+  // Split: event sales (have location, not TMM) vs TMM sales (no location needed)
+  const salesData = allParsed.filter(s => !s.isTMM && s.location);
+  const tmmSales = allParsed.filter(s => s.isTMM);
 
   // Group sales by location (join key, case-insensitive)
   const salesByLocation = {};
@@ -492,9 +496,10 @@ function processDataUK(masterRows, salesDataRows, tmmSalesRows, selectedWeek) {
       eventSales = allEventSales;
     }
 
-    // Detect country from sales data (if HF IE tab, it's Ireland)
-    const hasIrishSales = eventSales.some(s => s.country === "Ireland");
-    if (hasIrishSales) event.country = "Ireland";
+    // Detect country: use master tracker campaignGroup (primary) or Account Type (secondary)
+    if (event.campaignGroup === "HelloFresh Ireland") {
+      event.country = "Ireland";
+    }
 
     event.liveSalesCount = eventSales.length;
     event.uniqueAgentNames = new Set(eventSales.map(s => s.agentName));
@@ -600,27 +605,8 @@ function processDataUK(masterRows, salesDataRows, tmmSalesRows, selectedWeek) {
   const dailyLeaderboard = buildLeaderboard(todaySalesForLeaderboard);
   const weeklyLeaderboard = buildLeaderboard(weekSalesForLeaderboard);
 
-  // Process TMM Telesales separately (no Location — just count by date)
-  const tmmSales = tmmSalesRows
-    .filter(item => item && item.row && item.row.length >= 2)
-    .map(item => {
-      const row = item.row;
-      const cm = item.colMap || { date: 0, agent: 1, notListed: 2, accountType: 3 };
-      const accountType = (cm.accountType >= 0 ? (row[cm.accountType] || "") : "").trim().toLowerCase();
-      return {
-        date: parseUKSalesDate((row[cm.date] || "").trim()),
-        dateRaw: (row[cm.date] || "").trim(),
-        agentName: extractUKAgent(
-          cm.agent >= 0 ? row[cm.agent] : "",
-          cm.notListed >= 0 ? row[cm.notListed] : ""
-        ),
-        accountType,
-        weekNum: item.weekNum,
-      };
-    })
-    .filter(s => s.date);
-
-  // TMM: filter by date range of active week events
+  // TMM Telesales: tmmSales already classified from unified parsing above
+  // Filter by date range of active week events
   const weekStart = thisWeekEvts.length > 0
     ? thisWeekEvts.reduce((min, e) => (!min || (e.startDate && e.startDate < min) ? e.startDate : min), null)
     : null;
@@ -872,30 +858,27 @@ function useGoogleSheetsData() {
   // Cache raw data in refs so week changes don't trigger re-fetches
   const masterRowsRef = useRef(null);
   const salesDataRef = useRef(null);
-  const tmmSalesRef = useRef(null);
 
   const fetchData = useCallback(async () => {
     if (USE_MOCK_DATA) return;
     try {
       if (isFirstFetch.current) setLoading(true);
 
-      // Fetch master tracker and discover sales tabs in parallel
-      const [masterRes, { eventSalesTabs, tmmTabs }] = await Promise.all([
+      // Fetch master tracker and discover ALL sales tabs in parallel
+      const [masterRes, allSalesTabs] = await Promise.all([
         fetch(MASTER_TRACKER_URL),
         discoverSalesTabGids(),
       ]);
 
       if (!masterRes.ok) throw new Error(`Master tracker: HTTP ${masterRes.status}`);
 
-      // Fetch sales tabs sequentially (max 3 concurrent per batch)
+      // Fetch all sales tabs in one unified pass (max 3 concurrent per batch)
       const masterText = await masterRes.text();
-      const salesDataRows = await fetchAllSalesTabs(eventSalesTabs);
-      const tmmSalesRows = await fetchAllSalesTabs(tmmTabs);
+      const allSalesRows = await fetchAllSalesTabs(allSalesTabs);
 
       // Store raw data in refs
       masterRowsRef.current = parseCSV(masterText);
-      salesDataRef.current = salesDataRows;
-      tmmSalesRef.current = tmmSalesRows;
+      salesDataRef.current = allSalesRows;
 
       setLastUpdated(new Date());
       setError(null);
@@ -919,7 +902,7 @@ function useGoogleSheetsData() {
   // Process data whenever raw data or selectedWeek changes
   const processed = useMemo(() => {
     if (!masterRowsRef.current || !salesDataRef.current) return null;
-    return processDataUK(masterRowsRef.current, salesDataRef.current, tmmSalesRef.current || [], selectedWeek);
+    return processDataUK(masterRowsRef.current, salesDataRef.current || [], selectedWeek);
   }, [selectedWeek, rawFetchCount]);
 
   // Auto-set selectedWeek on first load
