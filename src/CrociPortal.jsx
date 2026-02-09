@@ -1995,7 +1995,7 @@ export default function CrociPortal() {
                         borderBottom: `2px solid ${campColor}33`,
                       }}>
                         {campCPA !== null
-                          ? <span style={{ fontSize: 13, fontWeight: 700, color: campCPA <= 80 ? "#FF00B1" : campCPA <= 150 ? "#FBC500" : "#ef4444", fontVariantNumeric: "tabular-nums" }}>£{campCPA.toFixed(2)}</span>
+                          ? <span style={{ fontSize: 13, fontWeight: 700, color: campCPA <= 20 ? "#FF00B1" : campCPA <= 35 ? "#FBC500" : "#ef4444", fontVariantNumeric: "tabular-nums" }}>£{campCPA.toFixed(2)}</span>
                           : <span style={{ color: "#475569", fontSize: 12 }}>--</span>}
                       </td>
                     </tr>
@@ -2044,7 +2044,7 @@ export default function CrociPortal() {
                           </td>
                           <td style={{ padding: "12px 14px" }}>
                             {event.cpa !== null
-                              ? <span style={{ fontSize: 13, fontWeight: 700, color: event.cpa <= 80 ? "#FF00B1" : event.cpa <= 150 ? "#FBC500" : "#ef4444", fontVariantNumeric: "tabular-nums" }}>{currSym}{event.cpa.toFixed(2)}</span>
+                              ? <span style={{ fontSize: 13, fontWeight: 700, color: event.cpa <= 20 ? "#FF00B1" : event.cpa <= 35 ? "#FBC500" : "#ef4444", fontVariantNumeric: "tabular-nums" }}>{currSym}{event.cpa.toFixed(2)}</span>
                               : <span style={{ color: "#475569", fontSize: 12 }}>--</span>}
                           </td>
                         </tr>
