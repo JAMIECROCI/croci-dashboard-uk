@@ -340,11 +340,11 @@ async function discoverSalesTabGids() {
   return [];
 }
 
-async function fetchSingleTab(tab, retries = 2) {
+async function fetchSingleTab(tab, retries = 3) {
   const url = `${SALES_CSV_BASE_URL}?gid=${tab.gid}&single=true&output=csv`;
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      if (attempt > 0) await new Promise(r => setTimeout(r, 1500 * attempt));
+      if (attempt > 0) await new Promise(r => setTimeout(r, 2000 * attempt));
       const res = await fetch(url);
       if (!res.ok) {
         console.warn(`Sales tab ${tab.name}: HTTP ${res.status} (attempt ${attempt + 1})`);
@@ -398,8 +398,8 @@ async function fetchSingleTab(tab, retries = 2) {
 }
 
 async function fetchAllSalesTabs(tabs) {
-  // Batch requests (3 at a time) to avoid Google Sheets rate limiting
-  const BATCH_SIZE = 3;
+  // Batch requests (2 at a time) to avoid Google Sheets rate limiting
+  const BATCH_SIZE = 2;
   const allResults = [];
   for (let i = 0; i < tabs.length; i += BATCH_SIZE) {
     const batch = tabs.slice(i, i + BATCH_SIZE);
@@ -407,7 +407,7 @@ async function fetchAllSalesTabs(tabs) {
     allResults.push(...batchResults);
     // Delay between batches to respect rate limits
     if (i + BATCH_SIZE < tabs.length) {
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 1000));
     }
   }
   return allResults.flat();
@@ -874,62 +874,92 @@ function useGoogleSheetsData() {
   const [rawFetchCount, setRawFetchCount] = useState(0);
   const isFirstFetch = useRef(true);
 
-  // Cache raw data in refs so week changes don't trigger re-fetches
+  // Cache raw data in refs
   const masterRowsRef = useRef(null);
+  const allTabsRef = useRef(null);     // All discovered tab GIDs (fetched once)
   const salesDataRef = useRef(null);
+  const prevWeekRef = useRef(null);    // Prevent double-fetch on mount
 
-  const fetchData = useCallback(async () => {
-    if (USE_MOCK_DATA) return;
+  // Phase 1: Discover master tracker + all tab GIDs (runs once on mount)
+  const initData = useCallback(async () => {
     try {
       if (isFirstFetch.current) setLoading(true);
-
-      // Fetch master tracker and discover ALL sales tabs in parallel
       const [masterRes, allSalesTabs] = await Promise.all([
         fetch(MASTER_TRACKER_URL),
         discoverSalesTabGids(),
       ]);
-
       if (!masterRes.ok) throw new Error(`Master tracker: HTTP ${masterRes.status}`);
+      masterRowsRef.current = parseCSV(await masterRes.text());
+      allTabsRef.current = allSalesTabs;
+      console.log(`Discovered ${allSalesTabs.length} sales tabs`);
+    } catch (err) {
+      setError(err.message);
+    }
+  }, []);
 
-      // Fetch all sales tabs in one unified pass (max 3 concurrent per batch)
-      const masterText = await masterRes.text();
-      const allSalesRows = await fetchAllSalesTabs(allSalesTabs);
-
-      // Store raw data in refs
-      masterRowsRef.current = parseCSV(masterText);
+  // Phase 2: Fetch only the selected week's sales tabs (~4 instead of 26)
+  const fetchWeekSales = useCallback(async (weekNum) => {
+    if (!allTabsRef.current || !weekNum) return;
+    try {
+      const weekTabs = allTabsRef.current.filter(t => t.weekNum === weekNum);
+      console.log(`Fetching ${weekTabs.length} tabs for ${weekNum}: ${weekTabs.map(t => t.name).join(', ')}`);
+      const allSalesRows = await fetchAllSalesTabs(weekTabs);
       salesDataRef.current = allSalesRows;
-
       setLastUpdated(new Date());
       setError(null);
       isFirstFetch.current = false;
       setRawFetchCount(c => c + 1);
     } catch (err) {
       setError(err.message);
-      isFirstFetch.current = false;
     } finally {
       setLoading(false);
     }
-  }, []); // No selectedWeek dependency — fetch once, process many
+  }, []);
 
+  // On mount: init master + tabs, then auto-detect and fetch current week
   useEffect(() => {
     if (USE_MOCK_DATA) return;
-    fetchData();
-    const interval = setInterval(fetchData, REFRESH_INTERVAL);
+    (async () => {
+      await initData();
+      // Auto-detect current week from master tracker data (no sales needed)
+      if (masterRowsRef.current) {
+        const tempProcessed = processDataUK(masterRowsRef.current, [], null);
+        const week = tempProcessed?.currentWeek;
+        if (week) {
+          prevWeekRef.current = week; // prevent double-fetch from selectedWeek effect
+          setSelectedWeek(week);
+          await fetchWeekSales(week);
+        }
+      }
+      setLoading(false);
+    })();
+  }, [initData, fetchWeekSales]);
+
+  // When user switches to a different week, fetch that week's sales tabs
+  useEffect(() => {
+    if (USE_MOCK_DATA || !selectedWeek || !allTabsRef.current) return;
+    // Skip if already fetched (mount or same week re-selection)
+    if (prevWeekRef.current === selectedWeek) return;
+    prevWeekRef.current = selectedWeek;
+    fetchWeekSales(selectedWeek);
+  }, [selectedWeek, fetchWeekSales]);
+
+  // Periodic refresh: re-fetch current week's sales tabs
+  useEffect(() => {
+    if (USE_MOCK_DATA) return;
+    const interval = setInterval(() => {
+      if (selectedWeek && allTabsRef.current) {
+        fetchWeekSales(selectedWeek);
+      }
+    }, REFRESH_INTERVAL);
     return () => clearInterval(interval);
-  }, [fetchData]);
+  }, [selectedWeek, fetchWeekSales]);
 
   // Process data whenever raw data or selectedWeek changes
   const processed = useMemo(() => {
     if (!masterRowsRef.current || !salesDataRef.current) return null;
-    return processDataUK(masterRowsRef.current, salesDataRef.current || [], selectedWeek);
+    return processDataUK(masterRowsRef.current, salesDataRef.current, selectedWeek);
   }, [selectedWeek, rawFetchCount]);
-
-  // Auto-set selectedWeek on first load
-  useEffect(() => {
-    if (processed && !selectedWeek) {
-      setSelectedWeek(processed.currentWeek);
-    }
-  }, [processed, selectedWeek]);
 
   return {
     data: processed?.data || null,
