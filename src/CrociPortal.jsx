@@ -2076,6 +2076,7 @@ export default function CrociPortal() {
                   const campTarget = groupEvents.reduce((s, e) => s + (e.target || 0), 0);
                   const campUpfronts = groupEvents.reduce((s, e) => s + (e.totalUpfronts || 0), 0);
                   const campCPA = campSales > 0 ? campUpfronts / campSales : null;
+                  const campCurrSym = getCurrencySymbol(groupEvents[0]?.country);
                   const campColor = CAMPAIGN_GROUP_COLORS[groupName] || "#64748b";
                   return (
                   <React.Fragment key={`group-${groupName}`}>
@@ -2117,7 +2118,7 @@ export default function CrociPortal() {
                         borderBottom: `2px solid ${campColor}33`,
                       }}>
                         {campCPA !== null
-                          ? <span style={{ fontSize: 13, fontWeight: 700, color: campCPA <= 20 ? "#FF00B1" : campCPA <= 35 ? "#FBC500" : "#ef4444", fontVariantNumeric: "tabular-nums" }}>£{campCPA.toFixed(2)}</span>
+                          ? <span style={{ fontSize: 13, fontWeight: 700, color: campCPA <= 20 ? "#FF00B1" : campCPA <= 35 ? "#FBC500" : "#ef4444", fontVariantNumeric: "tabular-nums" }}>{campCurrSym}{campCPA.toFixed(2)}</span>
                           : <span style={{ color: "#475569", fontSize: 12 }}>--</span>}
                       </td>
                     </tr>
