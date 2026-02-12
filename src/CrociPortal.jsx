@@ -260,10 +260,13 @@ function getCampaignGroup(client) {
 // Classify a sale row by its Account Type (Column D) value
 function classifySaleRow(accountType) {
   const at = (accountType || "").trim().toLowerCase();
+  // TMM Telesales: only bare "Reactivation" and "SUNP" (no brand prefix)
   if (at === "reactivation" || at === "sunp")
     return { campaign: "TMM Telesales", isTMM: true };
   if (at === "tails.com activation")
     return { campaign: "Tails.com", isTMM: false };
+  // HF/GC: all 4 variants — HelloFresh Activation, HelloFresh Reactivation,
+  // Green Chef Activation, Green Chef Reactivation
   if (at.includes("hellofresh") || at.includes("green chef"))
     return { campaign: "HF/GC", isTMM: false };
   return { campaign: "Unknown", isTMM: false };
@@ -379,6 +382,7 @@ async function fetchSingleTab(tab, retries = 2) {
       };
 
       const dataRows = rows.slice(headerIdx + 1);
+      console.log(`Sales tab ${tab.name}: ${dataRows.length} rows loaded`);
       return dataRows.map(row => ({
         row,
         colMap,
@@ -481,6 +485,7 @@ function processDataUK(masterRows, allSalesRows, selectedWeek) {
   // Split: event sales (have location, not TMM) vs TMM sales (no location needed)
   const salesData = allParsed.filter(s => !s.isTMM && s.location);
   const tmmSales = allParsed.filter(s => s.isTMM);
+  console.log(`Sales pipeline: ${allSalesRows.length} raw → ${allParsed.length} parsed → ${salesData.length} event + ${tmmSales.length} TMM`);
 
   // Group sales by location (join key, case-insensitive)
   const salesByLocation = {};
